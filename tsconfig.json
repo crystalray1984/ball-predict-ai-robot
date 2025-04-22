@@ -1,0 +1,14 @@
+{
+    "extends": "@tsconfig/node22/tsconfig.json",
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "module": "node16",
+        "types": ["./src/types.d.ts", "node"],
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "exclude": ["test"]
+}

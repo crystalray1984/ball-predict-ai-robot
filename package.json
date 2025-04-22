@@ -1,0 +1,40 @@
+{
+    "name": "ball-predict-ai-robot",
+    "private": true,
+    "version": "1.0.0",
+    "scripts": {
+        "build": "rimraf dist && tsc",
+        "start": "yarn && yarn build && pm2-runtime start pm2.json"
+    },
+    "devDependencies": {
+        "@tsconfig/node22": "^22.0.1",
+        "@types/lodash": "^4.17.16",
+        "@types/node": "^22.14.1",
+        "cross-env": "^7.0.3",
+        "prettier": "^3.5.3",
+        "rimraf": "^6.0.1",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.8.3"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "puppeteer"
+        ]
+    },
+    "dependencies": {
+        "axios": "^1.8.4",
+        "dayjs": "^1.11.13",
+        "decimal.js": "^10.5.0",
+        "dotenv": "^16.5.0",
+        "fast-xml-parser": "^5.2.0",
+        "generic-pool": "^3.9.0",
+        "ioredis": "^5.6.1",
+        "lodash": "^4.17.21",
+        "pg": "^8.14.1",
+        "pg-hstore": "^2.3.4",
+        "puppeteer": "^24.6.1",
+        "reflect-metadata": "^0.2.2",
+        "sequelize": "^6.37.7",
+        "sequelize-typescript": "^2.1.6"
+    }
+}
