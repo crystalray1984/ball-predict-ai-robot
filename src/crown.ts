@@ -95,16 +95,8 @@ export async function init() {
  * 等待页面准备完毕
  */
 async function ready() {
-    if (!mainPage) {
+    if (!mainPage || Date.now() - lastActiveTime >= 900000) {
         await init()
-    }
-
-    if (Date.now() - lastActiveTime >= 900000) {
-        console.log('auto reload')
-        //超过15分钟时自动刷新
-        await mainPage.reload()
-        await waitForElement(mainPage, '#today_page')
-        console.log('home page ready')
     }
 }
 
