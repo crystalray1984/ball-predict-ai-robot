@@ -66,9 +66,6 @@ export class Odd
     @Column(DataType.DECIMAL(10, 2))
     declare condition: string
 
-    @Column(DataType.BOOLEAN)
-    declare back: CreationOptional<boolean>
-
     /**
      * surebet赔率
      */

@@ -38,6 +38,9 @@ export class PromotedOdd extends Model<
     declare variety: Surebet.OddType['variety']
 
     @Column(DataType.STRING(50))
+    declare period: Surebet.OddType['period']
+
+    @Column(DataType.STRING(50))
     declare type: Surebet.OddType['type']
 
     @Column(DataType.DECIMAL(10, 2))
