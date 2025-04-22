@@ -17,8 +17,18 @@ const PAGE_URL = new URL('/', process.env.CROWN_URL ?? 'https://mos011.com').hre
  */
 async function waitForElement(page: Page, selector: string, cancelToken?: { aborted: boolean }) {
     while (true) {
-        const element = await page.$(selector)
-        if (element || cancelToken?.aborted) return
+        try {
+            const element = await page.$(selector)
+            if (element || cancelToken?.aborted) return
+        } catch (err) {
+            if (
+                !(err instanceof Error) ||
+                !err.message.includes('Execution context was destroyed')
+            ) {
+                throw err
+            }
+        }
+
         await delay(300)
     }
 }
