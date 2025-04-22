@@ -137,7 +137,7 @@ export async function getCrownData(
     par += "&ecid=" + ${JSON.stringify(crown_match_id)};
 
     var params = new URLSearchParams(par);
-    params.set('', 'zh-cn');
+    params.set('langx', 'zh-cn');
 
     var getHTML = new HttpRequest;
     return new Promise((resolve, reject) => {
