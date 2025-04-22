@@ -54,7 +54,7 @@ async function processOdd(row: Surebet.OutputData) {
     const crownData = await getCrownData(row.crown_match_id, getShowType(row.match_time))
 
     //如果比赛在3分钟内开始，那么进入最终判断流程
-    if (Date.now() - row.match_time <= 180000) {
+    if (row.match_time - Date.now() <= 180000) {
         const datas = await compareFinalData(row, crownData)
         if (datas.length === 0) return
 

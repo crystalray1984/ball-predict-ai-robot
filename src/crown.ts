@@ -56,7 +56,7 @@ export async function init() {
     }
 
     const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-images'],
+        args: ['--no-sandbox', '--disable-images', '--lang zh-cn'],
     })
 
     const page = await browser.newPage()
