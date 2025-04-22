@@ -117,6 +117,7 @@ export async function getCrownData(
     crown_match_id: string,
     show_type: 'today' | 'early' = 'today',
 ): Promise<Crown.Resp> {
+    console.log('发起皇冠请求', crown_match_id, show_type)
     await ready()
 
     const func = `
@@ -142,6 +143,7 @@ export async function getCrownData(
 `
 
     const resp = (await mainPage.evaluate(func)) as string
+    console.log('皇冠请求完成', crown_match_id, show_type)
     return parser.parse(resp).serverresponse
 }
 

@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { RateLimiter } from './common/rate-limit'
+import { getSetting } from './common/settings'
+import Decimal from 'decimal.js'
 
 interface GetOddsOptions {
     /**
@@ -100,6 +102,8 @@ export async function getSurebets() {
 
     const outupt: Surebet.OutputData[] = []
 
+    const min_surebet_value = (await getSetting('min_surebet_value')) as string
+
     //对盘口进行筛选
     for (const record of records) {
         //只筛选188bet的数据
@@ -194,6 +198,11 @@ export async function getSurebets() {
             odd.type.period === 'period1' &&
             ['over', 'under'].includes(odd.type.type)
         ) {
+            pass = true
+        }
+
+        //赔率大于指定的值
+        if (Decimal(odd.value).gte(min_surebet_value)) {
             pass = true
         }
 

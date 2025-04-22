@@ -519,6 +519,7 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
  */
 async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) {
     if (!Array.isArray(crown.game)) {
+        console.log('皇冠数据异常', crown)
         return
     }
 
