@@ -600,4 +600,10 @@ export async function startRobot() {
 
 if (require.main === module) {
     startRobot()
+        .then(() => {
+            process.exit(1)
+        })
+        .catch(() => {
+            process.exit(1)
+        })
 }
