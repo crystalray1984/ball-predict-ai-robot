@@ -552,47 +552,49 @@ export async function startRobot() {
     while (true) {
         await limiter.add(() => {})
 
-        //读取所有从surebet筛选来的数据
-        const odds = await getSurebets()
-        console.log(`收到筛选后的surebet数据 ${odds.length}条`)
-        odds.forEach((odd) => console.log(odd))
+        try {
+            //读取所有从surebet筛选来的数据
+            const odds = await getSurebets()
+            console.log(`收到筛选后的surebet数据 ${odds.length}条`)
+            odds.forEach((odd) => console.log(odd))
 
-        //循环处理surebet抓回来的数据
-        for (const odd of odds) {
-            await processOdd(odd)
-        }
-
-        //处理开赛前2分钟的比赛
-        let nearlyMatches = await Match.findAll({
-            where: {
-                match_time: {
-                    [Op.lte]: new Date(Date.now() + 120000),
-                    [Op.gt]: new Date(),
-                    status: '',
-                },
-            },
-        })
-
-        if (nearlyMatches.length > 0) {
-            const odds = await Odd.findAll({
-                where: {
-                    match_id: {
-                        [Op.in]: nearlyMatches.map((t) => t.id),
-                    },
-                    status: 'ready',
-                },
-            })
-
-            nearlyMatches.forEach((match) => {
-                match.odds = odds.filter((t) => t.match_id === match.id)
-            })
-
-            nearlyMatches = nearlyMatches.filter((t) => t.odds.length > 0)
-
-            for (const match of nearlyMatches) {
-                await processNearlyMatch(match)
+            //循环处理surebet抓回来的数据
+            for (const odd of odds) {
+                await processOdd(odd)
             }
-        }
+
+            //处理开赛前2分钟的比赛
+            let nearlyMatches = await Match.findAll({
+                where: {
+                    match_time: {
+                        [Op.lte]: new Date(Date.now() + 120000),
+                        [Op.gt]: new Date(),
+                        status: '',
+                    },
+                },
+            })
+
+            if (nearlyMatches.length > 0) {
+                const odds = await Odd.findAll({
+                    where: {
+                        match_id: {
+                            [Op.in]: nearlyMatches.map((t) => t.id),
+                        },
+                        status: 'ready',
+                    },
+                })
+
+                nearlyMatches.forEach((match) => {
+                    match.odds = odds.filter((t) => t.match_id === match.id)
+                })
+
+                nearlyMatches = nearlyMatches.filter((t) => t.odds.length > 0)
+
+                for (const match of nearlyMatches) {
+                    await processNearlyMatch(match)
+                }
+            }
+        } catch {}
     }
 }
 
