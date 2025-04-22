@@ -56,7 +56,7 @@ export async function init() {
     }
 
     const browser = await puppeteer.launch({
-        args: ['--no-sandbox'],
+        args: ['--no-sandbox', '--disable-images'],
     })
 
     const page = await browser.newPage()
@@ -88,6 +88,7 @@ export async function init() {
     console.log('home page ready')
 
     mainPage = page
+    lastActiveTime = Date.now()
 }
 
 /**
@@ -96,7 +97,6 @@ export async function init() {
 async function ready() {
     if (!mainPage) {
         await init()
-        lastActiveTime = Date.now()
     }
 
     if (Date.now() - lastActiveTime >= 900000) {
