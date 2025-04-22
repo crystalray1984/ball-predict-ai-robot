@@ -7,7 +7,7 @@ import { Op } from 'sequelize'
 import { RateLimiter } from './common/rate-limit'
 import { getSetting } from './common/settings'
 import { changeRatio, changeValue, getCrownData, init } from './crown'
-import { Match, Odd, Team, Tournament } from './db'
+import { Match, Odd, PromotedOdd, Team, Tournament } from './db'
 import { getSurebets } from './surebet'
 
 /**
@@ -53,159 +53,79 @@ async function processOdd(row: Surebet.OutputData) {
     //抓取皇冠数据
     const crownData = await getCrownData(row.crown_match_id, getShowType(row.match_time))
 
-    //如果比赛在3分钟内开始，那么进入最终判断流程
-    if (row.match_time - Date.now() <= 180000) {
-        const datas = await compareFinalData(row, crownData)
-        if (datas.length === 0) return
-
-        //把满足条件的盘口全部插入为“已推荐”
-        for (const data of datas) {
-            //盘口的条件满足，进入“准备中”
-            let match = await Match.findOne({
+    //进入“准备”判断流程
+    const data = await compareReadyData(row, crownData)
+    if (data) {
+        //盘口的条件满足，进入“准备中”
+        let match = await Match.findOne({
+            where: {
+                crown_match_id: Number(row.crown_match_id),
+            },
+        })
+        if (!match) {
+            //获取赛事id
+            let tournament = await Tournament.findOne({
                 where: {
-                    crown_match_id: Number(row.crown_match_id),
+                    crown_tournament_id: Number(data.game.lid),
                 },
             })
-            if (!match) {
-                //获取赛事id
-                let tournament = await Tournament.findOne({
-                    where: {
-                        crown_tournament_id: Number(data.game.lid),
-                    },
-                })
-                if (!tournament) {
-                    tournament = await Tournament.create({
-                        crown_tournament_id: Number(data.game.lid),
-                        name: data.game.league,
-                    })
-                }
-
-                //获取队伍id
-                let team1 = await Team.findOne({
-                    where: {
-                        crown_team_id: Number(data.game.team_id_h),
-                    },
-                })
-                if (!team1) {
-                    team1 = await Team.create({
-                        crown_team_id: Number(data.game.team_id_h),
-                        name: data.game.team_h,
-                    })
-                }
-                let team2 = await Team.findOne({
-                    where: {
-                        crown_team_id: Number(data.game.team_id_c),
-                    },
-                })
-                if (!team2) {
-                    team2 = await Team.create({
-                        crown_team_id: Number(data.game.team_id_c),
-                        name: data.game.team_c,
-                    })
-                }
-
-                //插入赛事
-                match = await Match.create({
-                    tournament_id: tournament.id,
-                    crown_match_id: Number(row.crown_match_id),
-                    team1_id: team1.id,
-                    team2_id: team2.id,
-                    match_time: new Date(row.match_time),
+            if (!tournament) {
+                tournament = await Tournament.create({
+                    crown_tournament_id: Number(data.game.lid),
+                    name: data.game.league,
                 })
             }
 
-            //插入盘口
-            await Odd.create({
-                match_id: match.id,
-                crown_match_id: Number(row.crown_match_id),
-                game: row.type.game,
-                base: row.type.base,
-                variety: row.type.variety,
-                period: row.type.period,
-                type: row.type.type,
-                condition: row.type.condition!,
-                surebet_value: row.surebet_value,
-                crown_value: data.data.value,
-                status: 'promoted',
-                surebet_updated_at,
-                crown_updated_at: new Date(),
-            })
-        }
-    } else {
-        //否则进入“准备”判断流程
-        const data = await compareReadyData(row, crownData)
-        if (data) {
-            //盘口的条件满足，进入“准备中”
-            let match = await Match.findOne({
+            //获取队伍id
+            let team1 = await Team.findOne({
                 where: {
-                    crown_match_id: Number(row.crown_match_id),
+                    crown_team_id: Number(data.game.team_id_h),
                 },
             })
-            if (!match) {
-                //获取赛事id
-                let tournament = await Tournament.findOne({
-                    where: {
-                        crown_tournament_id: Number(data.game.lid),
-                    },
+            if (!team1) {
+                team1 = await Team.create({
+                    crown_team_id: Number(data.game.team_id_h),
+                    name: data.game.team_h,
                 })
-                if (!tournament) {
-                    tournament = await Tournament.create({
-                        crown_tournament_id: Number(data.game.lid),
-                        name: data.game.league,
-                    })
-                }
-
-                //获取队伍id
-                let team1 = await Team.findOne({
-                    where: {
-                        crown_team_id: Number(data.game.team_id_h),
-                    },
-                })
-                if (!team1) {
-                    team1 = await Team.create({
-                        crown_team_id: Number(data.game.team_id_h),
-                        name: data.game.team_h,
-                    })
-                }
-                let team2 = await Team.findOne({
-                    where: {
-                        crown_team_id: Number(data.game.team_id_c),
-                    },
-                })
-                if (!team2) {
-                    team2 = await Team.create({
-                        crown_team_id: Number(data.game.team_id_c),
-                        name: data.game.team_c,
-                    })
-                }
-
-                //插入赛事
-                match = await Match.create({
-                    tournament_id: tournament.id,
-                    crown_match_id: Number(row.crown_match_id),
-                    team1_id: team1.id,
-                    team2_id: team2.id,
-                    match_time: new Date(row.match_time),
+            }
+            let team2 = await Team.findOne({
+                where: {
+                    crown_team_id: Number(data.game.team_id_c),
+                },
+            })
+            if (!team2) {
+                team2 = await Team.create({
+                    crown_team_id: Number(data.game.team_id_c),
+                    name: data.game.team_c,
                 })
             }
 
-            //插入盘口
-            await Odd.create({
-                match_id: match.id,
+            //插入赛事
+            match = await Match.create({
+                tournament_id: tournament.id,
                 crown_match_id: Number(row.crown_match_id),
-                game: row.type.game,
-                base: row.type.base,
-                variety: row.type.variety,
-                period: row.type.period,
-                type: row.type.type,
-                condition: row.type.condition!,
-                surebet_value: row.surebet_value,
-                crown_value: data.data.value,
-                status: 'ready',
-                surebet_updated_at,
-                crown_updated_at: new Date(),
+                team1_id: team1.id,
+                team2_id: team2.id,
+                match_time: new Date(row.match_time),
             })
         }
+
+        //插入盘口
+        await Odd.create({
+            match_id: match.id,
+            crown_match_id: Number(row.crown_match_id),
+            game: row.type.game,
+            base: row.type.base,
+            variety: row.type.variety,
+            period: row.type.period,
+            type: row.type.type,
+            condition: row.type.condition!,
+            surebet_value: row.surebet_value,
+            crown_value: data.data.value,
+            status: 'ready',
+            surebet_updated_at,
+            crown_updated_at: new Date(),
+        })
     }
 }
 
@@ -261,7 +181,32 @@ async function processNearlyMatch(match: Match) {
                     },
                 },
             )
+
             //然后插入推荐数据
+            await PromotedOdd.create(
+                {
+                    odd_id: odd.id,
+                    match_id: match.id,
+                    variety: odd.variety,
+                    period: odd.period,
+                    condition: Decimal(0).sub(odd.condition).toString(), //反向让球
+                    type: (() => {
+                        switch (odd.type) {
+                            case 'ah1':
+                                return 'ah2'
+                            case 'ah2':
+                                return 'ah1'
+                            case 'over':
+                                return 'under'
+                            case 'under':
+                                return 'over'
+                            default:
+                                return ''
+                        }
+                    })(), //反向投注
+                },
+                { returning: false },
+            )
         }
 
         //最后把当场比赛标记为“已结算”
