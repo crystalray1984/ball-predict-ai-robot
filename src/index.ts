@@ -9,6 +9,7 @@ import { getSetting } from './common/settings'
 import { changeRatio, changeValue, getCrownData, init } from './crown'
 import { Match, Odd, PromotedOdd, Team, Tournament } from './db'
 import { getSurebets } from './surebet'
+import { pick } from 'lodash'
 
 /**
  * 根据比赛时间确定用“早盘”还是“今日”获取皇冠数据
@@ -407,6 +408,12 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
         }
 
         //返回最终数据
+        //球队的信息要使用主盘口的
+        const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
+        Object.assign(
+            equals.game,
+            pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
+        )
         return [equals]
     }
 
@@ -453,6 +460,15 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
                 break
         }
     }
+
+    //返回的信息使用主盘口的
+    const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
+    result.forEach((row) => {
+        Object.assign(
+            row.game,
+            pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
+        )
+    })
 
     return result
 }
@@ -514,7 +530,12 @@ async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) 
         return
     }
 
-    //条件满足就返回皇冠的数据
+    //条件满足就返回皇冠的数据，但是球队的信息要使用主盘口的
+    const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
+    Object.assign(
+        equals.game,
+        pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
+    )
     return equals
 }
 
