@@ -135,11 +135,15 @@ export async function getCrownData(
     par += "&filter=All";
     par += "&ts=" + Date.now();
     par += "&ecid=" + ${JSON.stringify(crown_match_id)};
+
+    var params = new URLSearchParams(par);
+    params.set('', 'zh-cn');
+
     var getHTML = new HttpRequest;
     return new Promise((resolve, reject) => {
         getHTML.addEventListener("onError", reject);
         getHTML.addEventListener("LoadComplete", resolve);
-        getHTML.loadURL(top.m2_url, "POST", par)
+        getHTML.loadURL(top.m2_url, "POST", params.toString())
     })
 })()
 `
