@@ -202,8 +202,8 @@ export async function getSurebets() {
         }
 
         //赔率大于指定的值
-        if (Decimal(odd.value).gte(min_surebet_value)) {
-            pass = true
+        if (!Decimal(odd.value).gte(min_surebet_value)) {
+            pass = false
         }
 
         if (!pass) continue
