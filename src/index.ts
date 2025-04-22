@@ -36,7 +36,6 @@ async function processOdd(row: Surebet.OutputData) {
             period: row.type.period,
             type: row.type.type,
             condition: row.type.condition,
-            back: row.type.back,
         },
         include: [
             {
@@ -125,7 +124,6 @@ async function processOdd(row: Surebet.OutputData) {
                 period: row.type.period,
                 type: row.type.type,
                 condition: row.type.condition!,
-                back: row.type.back ?? false,
                 surebet_value: row.surebet_value,
                 crown_value: data.data.value,
                 status: 'promoted',
@@ -201,7 +199,6 @@ async function processOdd(row: Surebet.OutputData) {
                 period: row.type.period,
                 type: row.type.type,
                 condition: row.type.condition!,
-                back: row.type.back ?? false,
                 surebet_value: row.surebet_value,
                 crown_value: data.data.value,
                 status: 'ready',

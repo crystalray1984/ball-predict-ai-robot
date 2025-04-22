@@ -110,11 +110,6 @@ declare namespace Surebet {
         对于ah1/ah2/eh1/ehx/eh2的投注，它是让球值。 所有这些值将包含在单独的 condition 参数中。
         */
         type: string
-
-        /**
-         * 是否反向投注
-         */
-        back?: boolean
     }
 
     interface OddInfo {
