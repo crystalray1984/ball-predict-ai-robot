@@ -151,6 +151,7 @@ async function processNearlyMatch(match: Match) {
                 variety: odd.variety,
                 period: odd.period,
                 type: odd.type,
+                condition: odd.condition,
             },
         }
 
