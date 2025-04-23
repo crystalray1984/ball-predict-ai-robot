@@ -560,7 +560,11 @@ export async function startRobot() {
 
             //循环处理surebet抓回来的数据
             for (const odd of odds) {
-                await processOdd(odd)
+                try {
+                    await processOdd(odd)
+                } catch (err) {
+                    console.error(err)
+                }
             }
 
             //处理开赛前2分钟的比赛
@@ -591,7 +595,11 @@ export async function startRobot() {
                 nearlyMatches = nearlyMatches.filter((t) => t.odds.length > 0)
 
                 for (const match of nearlyMatches) {
-                    await processNearlyMatch(match)
+                    try {
+                        await processNearlyMatch(match)
+                    } catch (err) {
+                        console.error(err)
+                    }
                 }
             }
         } catch (err) {
