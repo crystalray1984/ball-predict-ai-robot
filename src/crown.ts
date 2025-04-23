@@ -115,7 +115,7 @@ const parser = new XMLParser({
  * @param show_type 数据类型
  * @returns
  */
-export async function getCrownData(
+async function _getCrownData(
     crown_match_id: string,
     show_type: 'today' | 'early' = 'today',
 ): Promise<Crown.Resp> {
@@ -151,6 +151,40 @@ export async function getCrownData(
     const resp = (await mainPage.evaluate(func)) as string
     console.log('皇冠请求完成', crown_match_id, show_type)
     return parser.parse(resp).serverresponse
+}
+
+/**
+ * 读取皇冠盘口数据
+ * @param crown_match_id 皇冠比赛id
+ * @param show_type 数据类型
+ * @returns
+ */
+export async function getCrownData(
+    crown_match_id: string,
+    show_type: 'today' | 'early' = 'today',
+): Promise<Crown.Resp> {
+    let tryCount = 3
+    while (true) {
+        try {
+            return await _getCrownData(crown_match_id, show_type)
+        } catch (err) {
+            console.error(err)
+            console.log(err)
+            console.log('重试次数', tryCount)
+            tryCount--
+            if (tryCount <= 0) {
+                throw err
+            }
+            reset()
+        }
+    }
+}
+
+/**
+ * 重置皇冠抓取环境
+ */
+export function reset() {
+    lastActiveTime = 0
 }
 
 /**

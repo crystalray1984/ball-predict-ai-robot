@@ -594,7 +594,9 @@ export async function startRobot() {
                     await processNearlyMatch(match)
                 }
             }
-        } catch {}
+        } catch (err) {
+            console.error(err)
+        }
     }
 }
 
