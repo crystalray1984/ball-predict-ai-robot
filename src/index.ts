@@ -573,10 +573,12 @@ export async function startRobot() {
                     match_time: {
                         [Op.lte]: new Date(Date.now() + 120000),
                         [Op.gt]: new Date(),
-                        status: '',
                     },
+                    status: '',
                 },
             })
+
+            console.log('2分钟内开赛的比赛', nearlyMatches.length)
 
             if (nearlyMatches.length > 0) {
                 const odds = await Odd.findAll({
@@ -587,6 +589,8 @@ export async function startRobot() {
                         status: 'ready',
                     },
                 })
+
+                console.log('2分钟内开赛的盘口', odds.length)
 
                 nearlyMatches.forEach((match) => {
                     match.odds = odds.filter((t) => t.match_id === match.id)
