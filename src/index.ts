@@ -135,31 +135,158 @@ async function processOdd(row: Surebet.OutputData) {
  * @param odd
  */
 async function processNearlyMatch(match: Match) {
+    //读取配置
+    const { corner_enable, corner_reverse, promote_reverse, period1_enable, filter_rate } =
+        await getSetting(
+            'corner_enable',
+            'corner_reverse',
+            'promote_reverse',
+            'period1_enable',
+            'filter_rate',
+        )
+
     //抓取皇冠数据
     const crownData = await getCrownData(match.crown_match_id.toString(), 'today')
 
     //对比赛中的每个盘口进行比对
     for (const odd of match.odds) {
-        //构建数据
-        const oddData: Surebet.OutputData = {
-            crown_match_id: match.crown_match_id.toString(),
-            match_time: match.match_time.valueOf(),
-            surebet_value: odd.surebet_value,
-            type: {
-                game: odd.game,
-                base: odd.base,
-                variety: odd.variety,
-                period: odd.period,
-                type: odd.type,
-                condition: odd.condition,
-            },
-        }
+        //第一波过滤，参数过滤
+        const pass = (() => {
+            if (!corner_enable && odd.variety === 'corner') {
+                //角球过滤
+                return false
+            }
+            if (!period1_enable && odd.period === 'period1') {
+                //上半场过滤
+                return false
+            }
 
-        //最终数据比对
-        const datas = await compareFinalData(oddData, crownData)
-        if (datas.length === 0) {
+            return true
+        })()
+
+        if (pass) {
+            //所有数据都通过，才进行数据比对
+            //构建数据
+            const oddData: Surebet.OutputData = {
+                crown_match_id: match.crown_match_id.toString(),
+                match_time: match.match_time.valueOf(),
+                surebet_value: odd.surebet_value,
+                type: {
+                    game: odd.game,
+                    base: odd.base,
+                    variety: odd.variety,
+                    period: odd.period,
+                    type: odd.type,
+                    condition: odd.condition,
+                },
+            }
+
+            //最终数据比对
+            const datas = await compareFinalData(oddData, crownData)
+            if (datas.length === 0) {
+                odd.status = 'ignored'
+                //没有任何满足条件的数据，将盘口标记为忽略
+                await Odd.update(
+                    {
+                        status: 'ignored',
+                    },
+                    {
+                        where: {
+                            id: odd.id,
+                        },
+                    },
+                )
+            } else {
+                odd.status = 'promoted'
+                //有满足条件的数据，先把盘口标记为已推荐
+                await Odd.update(
+                    {
+                        status: 'promoted',
+                    },
+                    {
+                        where: {
+                            id: odd.id,
+                        },
+                    },
+                )
+
+                //计算推荐数据
+                const { condition, type } = (() => {
+                    //是否反向推荐
+                    const reverse = odd.variety === 'corner' ? corner_reverse : promote_reverse
+                    if (!reverse) {
+                        //直接正向推荐
+                        return { condition: odd.condition, type: odd.type }
+                    } else if (odd.type === 'under' || odd.type === 'over') {
+                        //对于大小球，条件不需要反向，只是投注目标反向
+                        return {
+                            condition: odd.condition,
+                            type: odd.type === 'under' ? 'over' : 'under',
+                        }
+                    } else {
+                        //让球盘，条件和购买方向都是反向
+                        return {
+                            condition: Decimal(0).sub(odd.condition).toString(),
+                            type: odd.type === 'ah1' ? 'ah2' : 'ah1',
+                        }
+                    }
+                })()
+
+                //然后插入推荐数据
+                const promoted = await PromotedOdd.create(
+                    {
+                        odd_id: odd.id,
+                        match_id: match.id,
+                        variety: odd.variety,
+                        period: odd.period,
+                        condition,
+                        type,
+                    },
+                    { returning: ['id'] },
+                )
+
+                //根据推荐率，设定此盘口是否推荐
+                const count = await PromotedOdd.count({
+                    where: {
+                        id: {
+                            [Op.lte]: promoted.id,
+                        },
+                    },
+                })
+                let is_valid: boolean
+                switch (filter_rate) {
+                    case 1:
+                        //4场推1场
+                        is_valid = count % 4 === 0
+                        break
+                    case 2:
+                        is_valid = count % 2 === 0
+                        //4场推2场
+                        break
+                    case 2:
+                        //4场推3场
+                        is_valid = count % 4 !== 3
+                        break
+                    default:
+                        //全推
+                        is_valid = true
+                        break
+                }
+                await PromotedOdd.update(
+                    {
+                        is_valid,
+                    },
+                    {
+                        where: {
+                            id: promoted.id,
+                        },
+                        limit: 1,
+                    },
+                )
+            }
+        } else {
+            //不需要比对，直接放弃的盘口
             odd.status = 'ignored'
-            //没有任何满足条件的数据，将盘口标记为忽略
             await Odd.update(
                 {
                     status: 'ignored',
@@ -169,45 +296,6 @@ async function processNearlyMatch(match: Match) {
                         id: odd.id,
                     },
                 },
-            )
-        } else {
-            odd.status = 'promoted'
-            //有满足条件的数据，先把盘口标记为已推荐
-            await Odd.update(
-                {
-                    status: 'promoted',
-                },
-                {
-                    where: {
-                        id: odd.id,
-                    },
-                },
-            )
-
-            //然后插入推荐数据
-            await PromotedOdd.create(
-                {
-                    odd_id: odd.id,
-                    match_id: match.id,
-                    variety: odd.variety,
-                    period: odd.period,
-                    condition: Decimal(0).sub(odd.condition).toString(), //反向让球
-                    type: (() => {
-                        switch (odd.type) {
-                            case 'ah1':
-                                return 'ah2'
-                            case 'ah2':
-                                return 'ah1'
-                            case 'over':
-                                return 'under'
-                            case 'under':
-                                return 'over'
-                            default:
-                                return ''
-                        }
-                    })(), //反向投注
-                },
-                { returning: false },
             )
         }
 
@@ -363,10 +451,10 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
     }
 
     //首先通过读取一些配置值
-    const { promote_condition, allow_promote_1, allow_promote_2 } = await getSetting<string>(
+    const { promote_condition, allow_promote_1, promote_symbol } = await getSetting<string>(
         'promote_condition',
         'allow_promote_1',
-        'allow_promote_2',
+        'promote_symbol',
     )
 
     //根据surebet的盘口类型寻找皇冠数据中的对应盘口
@@ -403,9 +491,16 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
 
     if (equals) {
         //从最终盘口中找到对应的盘口，进行最终判断
-        if (!Decimal(equals.data.value).sub(surebet.surebet_value).gte(promote_condition)) {
-            //条件不满足
-            return []
+        if (promote_symbol === '<=') {
+            if (!Decimal(equals.data.value).sub(surebet.surebet_value).lte(promote_condition)) {
+                //条件不满足
+                return []
+            }
+        } else {
+            if (!Decimal(equals.data.value).sub(surebet.surebet_value).gte(promote_condition)) {
+                //条件不满足
+                return []
+            }
         }
 
         //返回最终数据

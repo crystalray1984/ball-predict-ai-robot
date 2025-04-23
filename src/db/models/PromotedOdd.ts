@@ -52,4 +52,10 @@ export class PromotedOdd extends Model<
     @CreatedAt
     @Column(DataType.DATE)
     declare created_at: CreationOptional<Date>
+
+    /**
+     * 是否最终推荐
+     */
+    @Column(DataType.BOOLEAN)
+    declare is_valid: CreationOptional<boolean>
 }
