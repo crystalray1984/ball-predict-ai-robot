@@ -1,6 +1,22 @@
-import type { CreationOptional, InferAttributes, InferCreationAttributes } from 'sequelize'
-import { Column, CreatedAt, DataType, HasMany, Model, Table, UpdatedAt } from 'sequelize-typescript'
+import {
+    type CreationOptional,
+    type InferAttributes,
+    type InferCreationAttributes,
+} from 'sequelize'
+import {
+    Column,
+    CreatedAt,
+    DataType,
+    ForeignKey,
+    HasMany,
+    HasOne,
+    Model,
+    Table,
+    UpdatedAt,
+    BelongsTo,
+} from 'sequelize-typescript'
 import { Odd } from './Odd'
+import { Team } from './Team'
 
 /**
  * 比赛表
@@ -33,14 +49,22 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
     /**
      * 主队id
      */
+    @ForeignKey(() => Team)
     @Column(DataType.INTEGER)
     declare team1_id: number
+
+    @BelongsTo(() => Match, 'team1_id')
+    declare team1: CreationOptional<Team>
 
     /**
      * 客队id
      */
+    @ForeignKey(() => Team)
     @Column(DataType.INTEGER)
     declare team2_id: number
+
+    @BelongsTo(() => Match, 'team2_id')
+    declare team2: CreationOptional<Team>
 
     /**
      * 比赛时间
@@ -70,4 +94,31 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
      */
     @Column(DataType.STRING(50))
     declare status: CreationOptional<string>
+
+    @Column(DataType.INTEGER)
+    declare score1: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare score2: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare score1_period1: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare score2_period1: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare corner1: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare corner2: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare corner1_period1: CreationOptional<number>
+
+    @Column(DataType.INTEGER)
+    declare corner2_period1: CreationOptional<number>
+
+    @Column(DataType.BOOLEAN)
+    declare has_score: CreationOptional<boolean>
 }

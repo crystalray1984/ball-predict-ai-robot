@@ -640,7 +640,14 @@ async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) 
  */
 export async function startRobot() {
     //首先初始化皇冠爬取环境
-    await init()
+    while (true) {
+        try {
+            await init()
+            break
+        } catch {
+            continue
+        }
+    }
 
     //然后启动surebet循环拉取数据
     const limiter = new RateLimiter(60000)
