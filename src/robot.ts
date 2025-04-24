@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import Decimal from 'decimal.js'
 import { pick } from 'lodash'
-import { Op } from 'sequelize'
+import { type CreationAttributes, Op } from 'sequelize'
 import { RateLimiter } from './common/rate-limit'
 import { getSetting } from './common/settings'
 import { changeRatio, changeValue, getCrownData, init } from './crown'
@@ -156,6 +156,9 @@ async function processNearlyMatch(match: Match) {
     //抓取皇冠数据
     const crownData = await getCrownData(match.crown_match_id.toString(), 'today')
 
+    //待插入的推荐数据
+    const promote_odd_attrs: CreationAttributes<PromotedOdd>[] = []
+
     //对比赛中的每个盘口进行比对
     for (const odd of match.odds) {
         //第一波过滤，参数过滤
@@ -191,32 +194,9 @@ async function processNearlyMatch(match: Match) {
 
             //最终数据比对
             const datas = await compareFinalData(oddData, crownData)
-            if (datas.length === 0) {
-                odd.status = 'ignored'
-                //没有任何满足条件的数据，将盘口标记为忽略
-                await Odd.update(
-                    {
-                        status: 'ignored',
-                    },
-                    {
-                        where: {
-                            id: odd.id,
-                        },
-                    },
-                )
-            } else {
-                odd.status = 'promoted'
-                //有满足条件的数据，先把盘口标记为已推荐
-                await Odd.update(
-                    {
-                        status: 'promoted',
-                    },
-                    {
-                        where: {
-                            id: odd.id,
-                        },
-                    },
-                )
+
+            if (datas.length > 0) {
+                //有满足条件的数据
 
                 //计算推荐数据
                 const { condition, type } = (() => {
@@ -241,56 +221,14 @@ async function processNearlyMatch(match: Match) {
                 })()
 
                 //然后插入推荐数据
-                const promoted = await PromotedOdd.create(
-                    {
-                        odd_id: odd.id,
-                        match_id: match.id,
-                        variety: odd.variety,
-                        period: odd.period,
-                        condition,
-                        type,
-                    },
-                    { returning: ['id'] },
-                )
-
-                //根据推荐率，设定此盘口是否推荐
-                const count = await PromotedOdd.count({
-                    where: {
-                        id: {
-                            [Op.lte]: promoted.id,
-                        },
-                    },
+                promote_odd_attrs.push({
+                    odd_id: odd.id,
+                    match_id: match.id,
+                    variety: odd.variety,
+                    period: odd.period,
+                    condition,
+                    type,
                 })
-                let is_valid: boolean
-                switch (filter_rate) {
-                    case 1:
-                        //4场推1场
-                        is_valid = count % 4 === 0
-                        break
-                    case 2:
-                        is_valid = count % 2 === 0
-                        //4场推2场
-                        break
-                    case 2:
-                        //4场推3场
-                        is_valid = count % 4 !== 3
-                        break
-                    default:
-                        //全推
-                        is_valid = true
-                        break
-                }
-                await PromotedOdd.update(
-                    {
-                        is_valid,
-                    },
-                    {
-                        where: {
-                            id: promoted.id,
-                        },
-                        limit: 1,
-                    },
-                )
             }
         } else {
             //不需要比对，直接放弃的盘口
@@ -306,19 +244,136 @@ async function processNearlyMatch(match: Match) {
                 },
             )
         }
+    }
 
-        //最后把当场比赛标记为“已结算”
-        await Match.update(
+    //更新原始推荐数据
+    const promotedOddIds = match.odds
+        .filter((t) => promote_odd_attrs.some((tt) => tt.odd_id === t.id))
+        .map((t) => t.id)
+    const ignoredOddIds = match.odds
+        .filter((t) => !promote_odd_attrs.some((tt) => tt.odd_id === t.id))
+        .map((t) => t.id)
+    if (promotedOddIds.length > 0) {
+        await Odd.update(
             {
-                status: 'final',
+                status: 'promoted',
             },
             {
                 where: {
-                    id: match.id,
+                    id: {
+                        [Op.in]: promotedOddIds,
+                    },
                 },
             },
         )
     }
+    if (ignoredOddIds.length > 0) {
+        await Odd.update(
+            {
+                status: 'ignored',
+            },
+            {
+                where: {
+                    id: {
+                        [Op.in]: ignoredOddIds,
+                    },
+                },
+            },
+        )
+    }
+
+    //对推荐的数据进行筛选，相同的盘口，只推荐条件更容易达成的
+    const filtered: CreationAttributes<PromotedOdd>[] = []
+    promote_odd_attrs.forEach((row) => {
+        const existsIndex = filtered.findIndex((t) => {
+            return t.period === row.period && t.type === row.type && t.variety === row.variety
+        })
+
+        //没找到直接添加就行
+        if (existsIndex === -1) {
+            filtered.push(row)
+            return
+        }
+
+        //如果找到了就进行对比，要更容易完成的那个
+        const exists = filtered[existsIndex]
+        let replace = false
+        switch (row.type) {
+            case 'ah1':
+            case 'ah2':
+                //对于让球，本方让球数更低或者受让数更高的为容易达成的
+                replace = Decimal(row.condition).comparedTo(exists.condition) > 0
+                break
+            case 'under':
+                //小球，大球越高越容易
+                replace = Decimal(row.condition).comparedTo(exists.condition) > 0
+                break
+            case 'over':
+                //大球，大球越低越容易
+                replace = Decimal(row.condition).comparedTo(exists.condition) < 0
+                break
+        }
+
+        if (replace) {
+            filtered.splice(existsIndex, 1, row)
+        }
+    })
+
+    //根据筛选后的盘口创建推荐数据
+    for (const row of filtered) {
+        const promoted = await PromotedOdd.create(row, { returning: ['id'] })
+
+        //根据推荐率，设定此盘口是否推荐
+        const count = await PromotedOdd.count({
+            where: {
+                id: {
+                    [Op.lte]: promoted.id,
+                },
+            },
+        })
+        let is_valid: boolean
+        switch (filter_rate) {
+            case 1:
+                //4场推1场
+                is_valid = count % 4 === 0
+                break
+            case 2:
+                is_valid = count % 2 === 0
+                //4场推2场
+                break
+            case 2:
+                //4场推3场
+                is_valid = count % 4 !== 3
+                break
+            default:
+                //全推
+                is_valid = true
+                break
+        }
+        await PromotedOdd.update(
+            {
+                is_valid,
+            },
+            {
+                where: {
+                    id: promoted.id,
+                },
+                limit: 1,
+            },
+        )
+    }
+
+    //最后把当场比赛标记为“已结算”
+    await Match.update(
+        {
+            status: 'final',
+        },
+        {
+            where: {
+                id: match.id,
+            },
+        },
+    )
 }
 
 /**
