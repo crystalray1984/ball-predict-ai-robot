@@ -53,7 +53,6 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
     @Column(DataType.INTEGER)
     declare team1_id: number
 
-    @HasOne(() => Match, 'team1_id')
     declare team1: CreationOptional<Team>
 
     /**
@@ -63,7 +62,6 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
     @Column(DataType.INTEGER)
     declare team2_id: number
 
-    @HasOne(() => Match, 'team2_id')
     declare team2: CreationOptional<Team>
 
     /**

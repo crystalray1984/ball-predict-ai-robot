@@ -4,6 +4,7 @@ import levenshtein from 'js-levenshtein'
 import { Op } from 'sequelize'
 import { RateLimiter } from './common/rate-limit'
 import { Match, Team } from './db'
+import { uniq } from 'lodash'
 
 const titan007Limiter = new RateLimiter(1000)
 
@@ -167,11 +168,25 @@ export async function startScoreRobot() {
                 },
                 has_score: false,
             },
-            include: [Team],
         })
 
         console.log('待计算赛果的比赛', matches.length)
         if (matches.length === 0) continue
+
+        //读取队伍名称
+        const teams = await Team.findAll({
+            where: {
+                id: {
+                    [Op.in]: uniq(matches.map((t) => [t.team1_id, t.team2_id])).flat(),
+                },
+            },
+        })
+
+        for (const match of matches) {
+            match.team1 = teams.find((t) => t.id === match.team1_id)!
+            match.team2 = teams.find((t) => t.id === match.team2_id)!
+        }
+
         await getMatchesScore(matches)
     }
 }
