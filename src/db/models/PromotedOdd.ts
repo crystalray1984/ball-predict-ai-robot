@@ -58,4 +58,13 @@ export class PromotedOdd extends Model<
      */
     @Column(DataType.BOOLEAN)
     declare is_valid: CreationOptional<boolean>
+
+    @Column(DataType.STRING(50))
+    declare score: CreationOptional<string>
+
+    /**
+     * 赛果对应的输赢
+     */
+    @Column(DataType.INTEGER)
+    declare result: CreationOptional<number>
 }
