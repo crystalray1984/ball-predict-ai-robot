@@ -1,7 +1,7 @@
 import { Decimal } from 'decimal.js'
 import { XMLParser } from 'fast-xml-parser'
 import { URL } from 'node:url'
-import puppeteer, { Page } from 'puppeteer'
+import puppeteer, { Browser, Page } from 'puppeteer'
 import { delay } from './common/helpers'
 
 /**
@@ -33,6 +33,7 @@ async function waitForElement(page: Page, selector: string, cancelToken?: { abor
     }
 }
 
+let browser: Browser = undefined as unknown as Browser
 /**
  * 皇冠主页面
  */
@@ -46,16 +47,13 @@ let lastActiveTime = 0
  * 初始化皇冠爬取环境
  */
 export async function init() {
-    if (mainPage) {
-        const browser = mainPage.browser()
-        await mainPage.close()
-        if (browser) {
-            await browser.close()
-        }
+    if (browser) {
+        await browser.close()
         mainPage = undefined as unknown as Page
+        browser = undefined as unknown as Browser
     }
 
-    const browser = await puppeteer.launch({
+    browser = await puppeteer.launch({
         args: ['--no-sandbox', '--disable-images', '--lang zh-cn'],
     })
 
