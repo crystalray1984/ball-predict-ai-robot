@@ -462,6 +462,7 @@ export async function startScoreRobot() {
                 status: 'final',
                 match_time: {
                     [Op.lt]: new Date(Date.now() - 9000000),
+                    [Op.gte]: new Date(Date.now() - 2 * 86400000),
                 },
                 has_score: false,
             },
