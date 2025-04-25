@@ -815,7 +815,7 @@ export async function startRobot() {
                     },
                 )
 
-                if (hasNearlyMatch.length > 0) {
+                if (hasNearlyMatch.length === 0) {
                     //可以抓取皇冠比赛列表
                     try {
                         console.log('正在抓取皇冠比赛列表')
