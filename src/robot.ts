@@ -1,12 +1,17 @@
 import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
 import Decimal from 'decimal.js'
 import { pick } from 'lodash'
-import { type CreationAttributes, Op } from 'sequelize'
+import { type CreationAttributes, Op, QueryTypes } from 'sequelize'
 import { RateLimiter } from './common/rate-limit'
 import { getSetting } from './common/settings'
-import { changeRatio, changeValue, getCrownData, init } from './crown'
-import { Match, Odd, PromotedOdd, Team, Tournament } from './db'
+import { changeRatio, changeValue, getCrownData, getCrownMatches, init } from './crown'
+import { db, Match, Odd, PromotedOdd, Team, Tournament } from './db'
 import { getSurebets } from './surebet'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 /**
  * 根据比赛时间确定用“早盘”还是“今日”获取皇冠数据
@@ -698,6 +703,8 @@ async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) 
     return equals
 }
 
+let lastMatchTime = 0
+
 /**
  * 启动爬虫任务
  */
@@ -734,15 +741,27 @@ export async function startRobot() {
             }
 
             //处理开赛前2分钟的比赛
-            let nearlyMatches = await Match.findAll({
-                where: {
-                    match_time: {
-                        [Op.lte]: new Date(Date.now() + 120000),
-                        [Op.gt]: new Date(),
-                    },
-                    status: '',
+            let nearlyMatches = await db.query(
+                {
+                    query: `
+            SELECT
+                "match".*
+            FROM
+                "match"
+            INNER JOIN
+                "odd" ON "odd"."match_id" = "match".id AND "odd"."status" = ?
+            WHERE
+                "match"."match_time" > ? AND "match"."match_time" <= ? AND "match"."status" = ?
+            ORDER BY
+                "match"."match_time"
+            `,
+                    values: ['ready', new Date(), new Date(Date.now() + 120000), ''],
                 },
-            })
+                {
+                    type: QueryTypes.SELECT,
+                    model: Match,
+                },
+            )
 
             console.log('2分钟内开赛的比赛', nearlyMatches.length)
 
@@ -767,6 +786,143 @@ export async function startRobot() {
                 for (const match of nearlyMatches) {
                     try {
                         await processNearlyMatch(match)
+                    } catch (err) {
+                        console.error(err)
+                    }
+                }
+            }
+
+            //如果20分钟内没有开赛的比赛，且距离上次抓取比赛列表超过1个小时，那么抓取皇冠的比赛列表
+            if (Date.now() - lastMatchTime >= 3600000) {
+                const hasNearlyMatch = await db.query(
+                    {
+                        query: `
+                SELECT
+                    "match"."id"
+                FROM
+                    "match"
+                INNER JOIN
+                    "odd" ON "odd"."match_id" = "match".id AND "odd"."status" = ?
+                WHERE
+                    "match"."match_time" > ? AND "match"."match_time" <= ? AND "match"."status" = ?
+                LIMIT 1
+                `,
+                        values: ['ready', new Date(), new Date(Date.now() + 1200000), ''],
+                    },
+                    {
+                        type: QueryTypes.SELECT,
+                        raw: true,
+                    },
+                )
+
+                if (hasNearlyMatch.length > 0) {
+                    //可以抓取皇冠比赛列表
+                    try {
+                        console.log('正在抓取皇冠比赛列表')
+                        const matches = await getCrownMatches()
+                        let insertedCount = 0
+                        for (const matchData of matches) {
+                            const timeMatch = /([0-9]+)-([0-9]+) ([0-9]+):([0-9]+)(a|p)/.exec(
+                                matchData.DATETIME,
+                            )!
+
+                            let hour = parseInt(timeMatch[3])
+                            if (timeMatch[5] === 'p') {
+                                hour += 12
+                            }
+
+                            const baseTime = dayjs.tz(matchData.SYSTIME, 'America/New_York')
+                            let matchTime = dayjs.tz(
+                                `${baseTime.year()}-${timeMatch[1]}-${timeMatch[2]} ${hour.toString().padStart(2, '0')}:${timeMatch[4]}`,
+                                'America/New_York',
+                            )
+
+                            //比赛时间不应小于当前时间，否则就年份+1
+                            if (matchTime.valueOf() < baseTime.valueOf()) {
+                                matchTime = matchTime.add(1, 'year')
+                            }
+
+                            const exists = await Match.findOne({
+                                where: {
+                                    crown_match_id: matchData.ECID,
+                                },
+                                attributes: ['id', 'match_time'],
+                            })
+                            if (exists) {
+                                //更新比赛时间
+                                if (exists.match_time.valueOf() !== matchTime.valueOf()) {
+                                    await Match.update(
+                                        {
+                                            match_time: matchTime.toDate(),
+                                        },
+                                        {
+                                            where: {
+                                                id: exists.id,
+                                            },
+                                        },
+                                    )
+                                }
+                                continue
+                            }
+
+                            //查询联赛是否存在
+                            let tournament = await Tournament.findOne({
+                                where: {
+                                    crown_tournament_id: matchData.LID,
+                                },
+                                attributes: ['id'],
+                            })
+                            if (!tournament) {
+                                //保存联赛
+                                tournament = await Tournament.create({
+                                    crown_tournament_id: matchData.LID,
+                                    name: matchData.LEAGUE,
+                                })
+                            }
+
+                            //查询队伍是否存在
+                            let team1 = await Team.findOne({
+                                where: {
+                                    crown_team_id: matchData.TEAM_H_ID,
+                                },
+                                attributes: ['id'],
+                            })
+                            if (!team1) {
+                                team1 = await Team.create({
+                                    crown_team_id: matchData.TEAM_H_ID,
+                                    name: matchData.TEAM_H,
+                                })
+                            }
+                            let team2 = await Team.findOne({
+                                where: {
+                                    crown_team_id: matchData.TEAM_C_ID,
+                                },
+                                attributes: ['id'],
+                            })
+                            if (!team2) {
+                                team2 = await Team.create({
+                                    crown_team_id: matchData.TEAM_C_ID,
+                                    name: matchData.TEAM_C,
+                                })
+                            }
+
+                            //插入比赛
+                            await Match.create(
+                                {
+                                    crown_match_id: matchData.ECID,
+                                    team1_id: team1.id,
+                                    team2_id: team2.id,
+                                    tournament_id: tournament.id,
+                                    match_time: matchTime.toDate(),
+                                },
+                                {
+                                    returning: false,
+                                },
+                            )
+                            insertedCount++
+                        }
+                        console.log('新增比赛数据', insertedCount)
+                        lastMatchTime = Date.now()
                     } catch (err) {
                         console.error(err)
                     }

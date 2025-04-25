@@ -54,6 +54,7 @@ export async function init() {
     }
 
     browser = await puppeteer.launch({
+        // headless: false,
         args: ['--no-sandbox', '--disable-images', '--lang zh-cn'],
     })
 
@@ -105,6 +106,7 @@ const parser = new XMLParser({
     parseTagValue: false,
     processEntities: false,
     ignoreDeclaration: true,
+    ignoreAttributes: false,
 })
 
 /**
@@ -281,4 +283,113 @@ export function changeRatio(ratio: string) {
         //两个让球值
         return Decimal(parts[0]).add(parts[1]).div(2).toString()
     }
+}
+
+/**
+ * 抓取皇冠比赛列表
+ */
+export async function getCrownMatches() {
+    await ready()
+
+    const func = `
+(function () {
+    var par = top.param;
+    par += "&p=get_league_list_All";
+    par += "&gtype=FT";
+    par += "&showtype=fu";
+    par += "&FS=N";
+    par += "&rtype=r";
+    par += "&date=all";
+    par += "&nocp=N";
+    par += "&ts=" + Date.now();
+
+    var params = new URLSearchParams(par);
+    params.set('langx', 'zh-cn');
+
+    var getHTML = new HttpRequest;
+    return new Promise((resolve, reject) => {
+        getHTML.addEventListener("onError", reject);
+        getHTML.addEventListener("LoadComplete", resolve);
+        getHTML.loadURL(top.m2_url, "POST", params.toString())
+    })
+})()
+`
+    const resp = (await mainPage.evaluate(func)) as string
+    console.log('抓取皇冠联赛列表完成')
+    const leagueList = parser.parse(resp).serverresponse
+
+    if (
+        !leagueList.coupons ||
+        leagueList.coupons.coupon_sw !== 'Y' ||
+        !Array.isArray(leagueList.coupons.coupon) ||
+        leagueList.coupons.coupon.length === 0
+    ) {
+        console.log('没有找到皇冠比赛数据')
+        return []
+    }
+
+    //联赛id列表
+    const lid = leagueList.coupons.coupon[0].lid
+
+    //读取联赛列表
+    await delay(1000)
+
+    const func2 = `
+(function () {
+    var par = top.param;
+    par += "&p=get_game_list";
+    par += "&p3type=";
+    par += "&date=1";
+    par += "&gtype=ft";
+    par += "&showtype=early";
+    par += "&rtype=r";
+    par += "&ltype=" + top["userData"].ltype;
+    par += "&filter=";
+    par += "&cupFantasy=N";
+    par += "&lid=" + ${JSON.stringify(lid)};
+    par += "&field=cp1";
+    par += "&action=clickCoupon";
+    par += "&sorttype=L";
+    par += "&specialClick=";
+    par += "&isFantasy=N";
+    par += "&ts=" + Date.now();
+
+    var params = new URLSearchParams(par);
+    params.set('langx', 'zh-cn');
+
+    var getHTML = new HttpRequest;
+    return new Promise((resolve, reject) => {
+        getHTML.addEventListener("onError", reject);
+        getHTML.addEventListener("LoadComplete", resolve);
+        getHTML.loadURL(top.m2_url, "POST", params.toString())
+    })
+})()
+`
+    const respList = (await mainPage.evaluate(func2)) as string
+    console.log('抓取皇冠比赛列表完成')
+    const gameList = parser.parse(respList).serverresponse
+
+    if (!Array.isArray(gameList.ec) || gameList.ec.length === 0) {
+        console.log('未读取到皇冠比赛列表')
+        return []
+    }
+
+    return (gameList.ec as Record<string, string>[])
+        .filter(
+            (t: Record<string, any>) => t['@_hasEC'] === 'Y' && t.game && t.game.ISFANTASY !== 'Y',
+        )
+        .map((row: Record<string, any>) => {
+            const game = row.game as Record<string, string>
+            return {
+                LID: parseInt(game.LID),
+                LEAGUE: game.LEAGUE,
+                TEAM_H_ID: parseInt(game.TEAM_H_ID),
+                TEAM_C_ID: parseInt(game.TEAM_C_ID),
+                TEAM_H: game.TEAM_H,
+                TEAM_C: game.TEAM_C,
+                ECID: parseInt(game.ECID),
+                DATETIME: game.DATETIME,
+                SYSTIME: game.SYSTIME,
+            }
+        })
 }
