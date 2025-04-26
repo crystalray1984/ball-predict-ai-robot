@@ -110,13 +110,13 @@ export async function getSurebets() {
         const odd = record.prongs.find((t) => t.bk === '188bet')
         if (!odd) continue
 
+        if (odd.type.game !== 'regular' || odd.type.base !== 'overall') continue
+
         //数据过滤，只留下需要的盘口
         let pass = false
 
         //全场让球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'goal' &&
             odd.type.period === 'regularTime' &&
             ['ah1', 'ah2'].includes(odd.type.type)
@@ -126,8 +126,6 @@ export async function getSurebets() {
 
         //全场大小球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'goal' &&
             odd.type.period === 'regularTime' &&
             ['over', 'under'].includes(odd.type.type)
@@ -137,8 +135,6 @@ export async function getSurebets() {
 
         //全场角球让球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'corner' &&
             odd.type.period === 'regularTime' &&
             ['ah1', 'ah2'].includes(odd.type.type)
@@ -148,8 +144,6 @@ export async function getSurebets() {
 
         //全场角球大小球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'corner' &&
             odd.type.period === 'regularTime' &&
             ['over', 'under'].includes(odd.type.type)
@@ -159,8 +153,6 @@ export async function getSurebets() {
 
         //上半场让球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'goal' &&
             odd.type.period === 'period1' &&
             ['ah1', 'ah2'].includes(odd.type.type)
@@ -170,8 +162,6 @@ export async function getSurebets() {
 
         //上半场大小球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'goal' &&
             odd.type.period === 'period1' &&
             ['over', 'under'].includes(odd.type.type)
@@ -181,8 +171,6 @@ export async function getSurebets() {
 
         //上半场角球让球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'corner' &&
             odd.type.period === 'period1' &&
             ['ah1', 'ah2'].includes(odd.type.type)
@@ -192,8 +180,6 @@ export async function getSurebets() {
 
         //上半场角球大小球
         if (
-            odd.type.game === 'regular' &&
-            odd.type.base === 'overall' &&
             odd.type.variety === 'corner' &&
             odd.type.period === 'period1' &&
             ['over', 'under'].includes(odd.type.type)
