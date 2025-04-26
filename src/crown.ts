@@ -1,8 +1,14 @@
+import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
 import { Decimal } from 'decimal.js'
 import { XMLParser } from 'fast-xml-parser'
 import { URL } from 'node:url'
 import puppeteer, { Browser, Page } from 'puppeteer'
 import { delay } from './common/helpers'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 /**
  * 皇冠首页地址
@@ -288,7 +294,7 @@ export function changeRatio(ratio: string) {
 /**
  * 抓取皇冠比赛列表
  */
-export async function getCrownMatches() {
+export async function getCrownMatches(): Promise<Required<Crown.MatchInfo>[]> {
     await ready()
 
     const func = `
@@ -374,22 +380,44 @@ export async function getCrownMatches() {
         return []
     }
 
-    return (gameList.ec as Record<string, string>[])
-        .filter(
-            (t: Record<string, any>) => t['@_hasEC'] === 'Y' && t.game && t.game.ISFANTASY !== 'Y',
-        )
-        .map((row: Record<string, any>) => {
-            const game = row.game as Record<string, string>
-            return {
-                LID: parseInt(game.LID),
-                LEAGUE: game.LEAGUE,
-                TEAM_H_ID: parseInt(game.TEAM_H_ID),
-                TEAM_C_ID: parseInt(game.TEAM_C_ID),
-                TEAM_H: game.TEAM_H,
-                TEAM_C: game.TEAM_C,
-                ECID: parseInt(game.ECID),
-                DATETIME: game.DATETIME,
-                SYSTIME: game.SYSTIME,
-            }
+    const result: Required<Crown.MatchInfo>[] = []
+
+    gameList.ec.forEach((ec: Record<string, any>) => {
+        if (ec['@_hasEC'] !== 'Y' || !ec.game || ec.game.ISFANTASY === 'Y') return
+        const game = ec.game as Record<string, string>
+        result.push({
+            lid: game.LID,
+            league: game.LEAGUE,
+            team_id_h: game.TEAM_H_ID,
+            team_id_c: game.TEAM_C_ID,
+            team_h: game.TEAM_H,
+            team_c: game.TEAM_C,
+            ecid: game.ECID,
+            match_time: parseMatchTime(game.SYSTIME, game.DATETIME),
         })
+    })
+
+    return result
+}
+
+function parseMatchTime(SYSTIME: string, DATETIME: string) {
+    const timeMatch = /([0-9]+)-([0-9]+) ([0-9]+):([0-9]+)(a|p)/.exec(DATETIME)!
+
+    let hour = parseInt(timeMatch[3])
+    if (timeMatch[5] === 'p') {
+        hour += 12
+    }
+
+    const baseTime = dayjs.tz(SYSTIME, 'America/New_York')
+    let matchTime = dayjs.tz(
+        `${baseTime.year()}-${timeMatch[1]}-${timeMatch[2]} ${hour.toString().padStart(2, '0')}:${timeMatch[4]}`,
+        'America/New_York',
+    )
+
+    //比赛时间不应小于当前时间，否则就年份+1
+    if (matchTime.valueOf() < baseTime.valueOf()) {
+        matchTime = matchTime.add(1, 'year')
+    }
+
+    return matchTime.toDate()
 }

@@ -35,16 +35,28 @@ export class PromotedOdd extends Model<
     declare match_id: number
 
     @Column(DataType.STRING(50))
-    declare variety: Surebet.OddType['variety']
+    declare variety: string
 
     @Column(DataType.STRING(50))
-    declare period: Surebet.OddType['period']
+    declare period: string
 
     @Column(DataType.STRING(50))
-    declare type: Surebet.OddType['type']
+    declare type: string
 
     @Column(DataType.DECIMAL(10, 2))
     declare condition: string
+
+    /**
+     * 是否反推
+     */
+    @Column(DataType.BOOLEAN)
+    declare back: boolean
+
+    /**
+     * 推荐的规则，0-正常规则，1-特殊规则
+     */
+    @Column(DataType.INTEGER)
+    declare special: CreationOptional<number>
 
     /**
      * 记录创建时间

@@ -14,10 +14,7 @@ import { Match } from './Match'
  * 队伍表
  */
 @Table({ tableName: 'odd', timestamps: true, updatedAt: false })
-export class Odd
-    extends Model<InferAttributes<Odd>, InferCreationAttributes<Odd>>
-    implements Surebet.OddType
-{
+export class Odd extends Model<InferAttributes<Odd>, InferCreationAttributes<Odd>> {
     /**
      * 盘口id
      */
@@ -37,22 +34,10 @@ export class Odd
     declare match_id: number
 
     /**
-     * 所属的比赛
-     */
-    @BelongsTo(() => Match)
-    declare match: CreationOptional<Match>
-
-    /**
      * 皇冠比赛id
      */
     @Column(DataType.INTEGER)
     declare crown_match_id: number
-
-    @Column(DataType.STRING(50))
-    declare game: string
-
-    @Column(DataType.STRING(50))
-    declare base: string
 
     @Column(DataType.STRING(50))
     declare variety: string
@@ -67,16 +52,22 @@ export class Odd
     declare condition: string
 
     /**
-     * surebet赔率
+     * surebet推送水位
      */
     @Column(DataType.DECIMAL(10, 4))
     declare surebet_value: string
 
     /**
-     * 皇冠赔率
+     * 第一次对比皇冠水位
      */
     @Column(DataType.DECIMAL(10, 4))
     declare crown_value: string
+
+    /**
+     * 第二次比对皇冠水位
+     */
+    @Column(DataType.DECIMAL(10, 4))
+    declare crown_value2: CreationOptional<string>
 
     /**
      * 盘口状态

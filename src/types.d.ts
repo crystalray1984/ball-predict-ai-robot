@@ -162,9 +162,17 @@ declare namespace Surebet {
 
 declare namespace Crown {
     /**
-     * 皇冠返回的单个盘口数据
+     * 由皇冠返回的比赛数据
      */
-    interface Game {
+    interface MatchInfo {
+        /**
+         * 比赛时间
+         */
+        match_time?: number | Date
+        /**
+         * 皇冠比赛id
+         */
+        ecid: string
         /**
          * 赛事名称
          */
@@ -173,10 +181,6 @@ declare namespace Crown {
          * 皇冠赛事id
          */
         lid: string
-        /**
-         * 盘口类型 0-赛果 146-角球
-         */
-        ptype_id: string
         /**
          * 主队名称
          */
@@ -193,6 +197,16 @@ declare namespace Crown {
          * 客队id
          */
         team_id_c: string
+    }
+
+    /**
+     * 皇冠返回的单个盘口数据
+     */
+    interface Game extends MatchInfo {
+        /**
+         * 盘口类型 0-赛果 146-角球
+         */
+        ptype_id: string
         /**
          * 让球方
          */

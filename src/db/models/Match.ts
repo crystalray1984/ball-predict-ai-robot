@@ -9,14 +9,14 @@ import {
     DataType,
     ForeignKey,
     HasMany,
-    HasOne,
     Model,
     Table,
     UpdatedAt,
-    BelongsTo,
 } from 'sequelize-typescript'
 import { Odd } from './Odd'
 import { Team } from './Team'
+import { Tournament } from './Tournament'
+import dayjs from 'dayjs'
 
 /**
  * 比赛表
@@ -119,4 +119,89 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
 
     @Column(DataType.BOOLEAN)
     declare has_score: CreationOptional<boolean>
+
+    /**
+     * 创建比赛数据
+     * @param info
+     */
+    static async createMatch(info: Required<Crown.MatchInfo>): Promise<number> {
+        const crown_match_id = parseInt(info.ecid)
+
+        let match = await Match.findOne({
+            where: {
+                crown_match_id,
+            },
+            attributes: ['id', 'match_time'],
+        })
+
+        if (match) {
+            if (match.match_time.valueOf() !== dayjs(info.match_time).valueOf()) {
+                //更新比赛时间
+                await Match.update(
+                    {
+                        match_time: dayjs(info.match_time).toDate(),
+                    },
+                    {
+                        where: {
+                            id: match.id,
+                        },
+                    },
+                )
+            }
+            return match.id
+        }
+
+        //获取赛事id
+        let tournament = await Tournament.findOne({
+            where: {
+                crown_tournament_id: parseInt(info.lid),
+            },
+        })
+        if (!tournament) {
+            tournament = await Tournament.create({
+                crown_tournament_id: parseInt(info.lid),
+                name: info.league,
+            })
+        }
+
+        //获取队伍id
+        let team1 = await Team.findOne({
+            where: {
+                crown_team_id: parseInt(info.team_id_h),
+            },
+        })
+        if (!team1) {
+            team1 = await Team.create({
+                crown_team_id: parseInt(info.team_id_h),
+                name: info.team_h,
+            })
+        }
+        let team2 = await Team.findOne({
+            where: {
+                crown_team_id: parseInt(info.team_id_c),
+            },
+        })
+        if (!team2) {
+            team2 = await Team.create({
+                crown_team_id: parseInt(info.team_id_c),
+                name: info.team_c,
+            })
+        }
+
+        //插入赛事
+        match = await Match.create(
+            {
+                tournament_id: tournament.id,
+                crown_match_id,
+                team1_id: team1.id,
+                team2_id: team2.id,
+                match_time: dayjs(info.match_time).toDate(),
+            },
+            {
+                returning: ['id'],
+            },
+        )
+
+        return match.id
+    }
 }

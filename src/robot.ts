@@ -7,7 +7,7 @@ import { type CreationAttributes, Op, QueryTypes } from 'sequelize'
 import { RateLimiter } from './common/rate-limit'
 import { getSetting } from './common/settings'
 import { changeRatio, changeValue, getCrownData, getCrownMatches, init } from './crown'
-import { db, Match, Odd, PromotedOdd, Team, Tournament } from './db'
+import { db, Match, Odd, PromotedOdd } from './db'
 import { getSurebets } from './surebet'
 
 dayjs.extend(utc)
@@ -33,19 +33,11 @@ async function processOdd(row: Surebet.OutputData) {
     const exists = await Odd.findOne({
         where: {
             crown_match_id: row.crown_match_id,
-            game: row.type.game,
-            base: row.type.base,
             variety: row.type.variety,
             period: row.type.period,
             type: row.type.type,
             condition: row.type.condition,
         },
-        include: [
-            {
-                model: Match,
-                required: true,
-            },
-        ],
     })
 
     if (exists && exists.status !== '') {
@@ -64,78 +56,29 @@ async function processOdd(row: Surebet.OutputData) {
             await exists.update({
                 surebet_value: row.surebet_value,
                 crown_value: data.data.value,
-                status: 'ready',
+                status: data.pass ? 'ready' : '',
                 surebet_updated_at,
                 crown_updated_at: new Date(),
             })
         } else {
-            //盘口的条件满足，进入“准备中”
-            let match = await Match.findOne({
-                where: {
-                    crown_match_id: Number(row.crown_match_id),
-                },
+            //插入比赛
+            const match_id = await Match.createMatch({
+                ...data.game,
+                match_time: row.match_time,
+                ecid: row.crown_match_id,
             })
-            if (!match) {
-                //获取赛事id
-                let tournament = await Tournament.findOne({
-                    where: {
-                        crown_tournament_id: Number(data.game.lid),
-                    },
-                })
-                if (!tournament) {
-                    tournament = await Tournament.create({
-                        crown_tournament_id: Number(data.game.lid),
-                        name: data.game.league,
-                    })
-                }
-
-                //获取队伍id
-                let team1 = await Team.findOne({
-                    where: {
-                        crown_team_id: Number(data.game.team_id_h),
-                    },
-                })
-                if (!team1) {
-                    team1 = await Team.create({
-                        crown_team_id: Number(data.game.team_id_h),
-                        name: data.game.team_h,
-                    })
-                }
-                let team2 = await Team.findOne({
-                    where: {
-                        crown_team_id: Number(data.game.team_id_c),
-                    },
-                })
-                if (!team2) {
-                    team2 = await Team.create({
-                        crown_team_id: Number(data.game.team_id_c),
-                        name: data.game.team_c,
-                    })
-                }
-
-                //插入赛事
-                match = await Match.create({
-                    tournament_id: tournament.id,
-                    crown_match_id: Number(row.crown_match_id),
-                    team1_id: team1.id,
-                    team2_id: team2.id,
-                    match_time: new Date(row.match_time),
-                })
-            }
 
             //插入盘口
             await Odd.create({
-                match_id: match.id,
-                crown_match_id: Number(row.crown_match_id),
-                game: row.type.game,
-                base: row.type.base,
+                match_id,
+                crown_match_id: parseInt(row.crown_match_id),
                 variety: row.type.variety,
                 period: row.type.period,
                 type: row.type.type,
                 condition: row.type.condition!,
                 surebet_value: row.surebet_value,
                 crown_value: data.data.value,
-                status: 'ready',
+                status: data.pass ? 'ready' : '',
                 surebet_updated_at,
                 crown_updated_at: new Date(),
             })
@@ -188,8 +131,8 @@ async function processNearlyMatch(match: Match) {
                 match_time: match.match_time.valueOf(),
                 surebet_value: odd.surebet_value,
                 type: {
-                    game: odd.game,
-                    base: odd.base,
+                    game: 'regular',
+                    base: 'overall',
                     variety: odd.variety,
                     period: odd.period,
                     type: odd.type,
@@ -198,46 +141,80 @@ async function processNearlyMatch(match: Match) {
             }
 
             //最终数据比对
-            const datas = await compareFinalData(oddData, crownData)
+            const data = await compareFinalData(oddData, crownData)
 
-            if (datas.length > 0) {
+            if (data) {
                 //有满足条件的数据
-
-                //计算推荐数据
-                const { condition, type } = (() => {
-                    //是否反向推荐
-                    const reverse = odd.variety === 'corner' ? corner_reverse : promote_reverse
-                    if (!reverse) {
-                        //直接正向推荐
-                        return { condition: odd.condition, type: odd.type }
-                    } else if (odd.type === 'under' || odd.type === 'over') {
-                        //对于大小球，条件不需要反向，只是投注目标反向
-                        return {
-                            condition: odd.condition,
-                            type: odd.type === 'under' ? 'over' : 'under',
+                if (data.pass) {
+                    //比对的结果符合条件
+                    //计算推荐数据
+                    const { condition, type, back } = (() => {
+                        //是否反向推荐
+                        const back =
+                            odd.variety === 'corner'
+                                ? (corner_reverse ?? false)
+                                : (promote_reverse ?? false)
+                        if (!back) {
+                            //直接正向推荐
+                            return { condition: odd.condition, type: odd.type, back }
+                        } else if (odd.type === 'under' || odd.type === 'over') {
+                            //对于大小球，条件不需要反向，只是投注目标反向
+                            return {
+                                condition: odd.condition,
+                                type: odd.type === 'under' ? 'over' : 'under',
+                                back,
+                            }
+                        } else {
+                            //让球盘，条件和购买方向都是反向
+                            return {
+                                condition: Decimal(0).sub(odd.condition).toString(),
+                                type: odd.type === 'ah1' ? 'ah2' : 'ah1',
+                                back,
+                            }
                         }
-                    } else {
-                        //让球盘，条件和购买方向都是反向
-                        return {
-                            condition: Decimal(0).sub(odd.condition).toString(),
-                            type: odd.type === 'ah1' ? 'ah2' : 'ah1',
-                        }
-                    }
-                })()
+                    })()
 
-                //然后插入推荐数据
-                promote_odd_attrs.push({
-                    odd_id: odd.id,
-                    match_id: match.id,
-                    variety: odd.variety,
-                    period: odd.period,
-                    condition,
-                    type,
-                })
+                    //然后插入推荐数据
+                    promote_odd_attrs.push({
+                        odd_id: odd.id,
+                        match_id: match.id,
+                        variety: odd.variety,
+                        period: odd.period,
+                        condition,
+                        type,
+                        back,
+                        special: data.special ?? 0,
+                    })
+
+                    //标记盘口为比对成功
+                    await Odd.update(
+                        {
+                            status: 'promoted',
+                            crown_value2: data.data.value,
+                        },
+                        {
+                            where: {
+                                id: odd.id,
+                            },
+                        },
+                    )
+                } else {
+                    //比对的结果不符合条件
+                    await Odd.update(
+                        {
+                            status: 'ignored',
+                            crown_value2: data.data.value,
+                        },
+                        {
+                            where: {
+                                id: odd.id,
+                            },
+                        },
+                    )
+                }
             }
         } else {
             //不需要比对，直接放弃的盘口
-            odd.status = 'ignored'
             await Odd.update(
                 {
                     status: 'ignored',
@@ -249,42 +226,6 @@ async function processNearlyMatch(match: Match) {
                 },
             )
         }
-    }
-
-    //更新原始推荐数据
-    const promotedOddIds = match.odds
-        .filter((t) => promote_odd_attrs.some((tt) => tt.odd_id === t.id))
-        .map((t) => t.id)
-    const ignoredOddIds = match.odds
-        .filter((t) => !promote_odd_attrs.some((tt) => tt.odd_id === t.id))
-        .map((t) => t.id)
-    if (promotedOddIds.length > 0) {
-        await Odd.update(
-            {
-                status: 'promoted',
-            },
-            {
-                where: {
-                    id: {
-                        [Op.in]: promotedOddIds,
-                    },
-                },
-            },
-        )
-    }
-    if (ignoredOddIds.length > 0) {
-        await Odd.update(
-            {
-                status: 'ignored',
-            },
-            {
-                where: {
-                    id: {
-                        [Op.in]: ignoredOddIds,
-                    },
-                },
-            },
-        )
     }
 
     //对推荐的数据进行筛选，相同的盘口，只推荐条件更容易达成的
@@ -393,6 +334,19 @@ interface MatchGameData {
      * 皇冠赔率
      */
     value: string
+}
+
+/**
+ * 匹配的盘口数据
+ */
+interface MatchOddData {
+    game: Crown.Game
+    data: MatchGameData
+}
+
+interface MatchOddData2 extends MatchOddData {
+    pass: boolean
+    special?: number
 }
 
 /**
@@ -513,9 +467,13 @@ function getGameData(type: Surebet.OddType, game: Crown.Game): MatchGameData | v
  * @param surebet
  * @param crown
  */
-async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) {
+async function compareFinalData(
+    surebet: Surebet.OutputData,
+    crown: Crown.Resp,
+): Promise<MatchOddData2 | void> {
     if (!Array.isArray(crown.game)) {
-        return []
+        console.log('皇冠数据异常', crown)
+        return
     }
 
     //首先通过读取一些配置值
@@ -537,13 +495,7 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
     })
 
     //从各个盘口中寻找与当前盘口相同的盘口
-    const equals = games.reduce<
-        | {
-              game: Crown.Game
-              data: MatchGameData
-          }
-        | undefined
-    >((prev, game) => {
+    const equals = games.reduce<MatchOddData | undefined>((prev, game) => {
         if (prev) return prev
         //寻找类型相同的盘口
         const data = getGameData(surebet.type, game)
@@ -558,19 +510,6 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
     }, undefined)
 
     if (equals) {
-        //从最终盘口中找到对应的盘口，进行最终判断
-        if (promote_symbol === '<=') {
-            if (!Decimal(equals.data.value).sub(surebet.surebet_value).lte(promote_condition)) {
-                //条件不满足
-                return []
-            }
-        } else {
-            if (!Decimal(equals.data.value).sub(surebet.surebet_value).gte(promote_condition)) {
-                //条件不满足
-                return []
-            }
-        }
-
         //返回最终数据
         //球队的信息要使用主盘口的
         const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
@@ -578,11 +517,35 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
             equals.game,
             pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
         )
-        return [equals]
+
+        //从最终盘口中找到对应的盘口，进行最终判断
+        if (promote_symbol === '<=') {
+            if (!Decimal(equals.data.value).sub(surebet.surebet_value).lte(promote_condition)) {
+                //条件不满足
+                return {
+                    ...equals,
+                    pass: false,
+                }
+            }
+        } else {
+            if (!Decimal(equals.data.value).sub(surebet.surebet_value).gte(promote_condition)) {
+                //条件不满足
+                return {
+                    ...equals,
+                    pass: false,
+                }
+            }
+        }
+
+        //满足条件返回
+        return {
+            ...equals,
+            pass: true,
+        }
     }
 
     //没有对应盘口的时候判断一下开关
-    if (!allow_promote_1) return []
+    if (!allow_promote_1) return
 
     //没有从最终盘口中找到原来对应的盘口，那么对其他盘口进行判断
     const result: { game: Crown.Game; data: MatchGameData }[] = []
@@ -625,16 +588,24 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
         }
     }
 
+    if (result.length === 0) {
+        return
+    }
+
+    const specialResult = result[0]
+
     //返回的信息使用主盘口的
     const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
-    result.forEach((row) => {
-        Object.assign(
-            row.game,
-            pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
-        )
-    })
+    Object.assign(
+        specialResult.game,
+        pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
+    )
 
-    return result
+    return {
+        ...specialResult,
+        pass: true,
+        special: 1,
+    }
 }
 
 /**
@@ -642,7 +613,10 @@ async function compareFinalData(surebet: Surebet.OutputData, crown: Crown.Resp) 
  * @param surebet
  * @param crown
  */
-async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) {
+async function compareReadyData(
+    surebet: Surebet.OutputData,
+    crown: Crown.Resp,
+): Promise<MatchOddData2 | void> {
     if (!Array.isArray(crown.game)) {
         console.log('皇冠数据异常', crown)
         return
@@ -663,13 +637,7 @@ async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) 
     })
 
     //从各个盘口中寻找与当前盘口相同的盘口
-    const equals = games.reduce<
-        | {
-              game: Crown.Game
-              data: MatchGameData
-          }
-        | undefined
-    >((prev, game) => {
+    const equals = games.reduce<MatchOddData | undefined>((prev, game) => {
         if (prev) return prev
         //寻找相同的盘口
         const data = getGameData(surebet.type, game)
@@ -688,19 +656,26 @@ async function compareReadyData(surebet: Surebet.OutputData, crown: Crown.Resp) 
         return
     }
 
-    //找到了盘口那么做赔率比对
-    if (!Decimal(equals.data.value).sub(surebet.surebet_value).gte(ready_condition)) {
-        //条件不满足
-        return
-    }
-
-    //条件满足就返回皇冠的数据，但是球队的信息要使用主盘口的
+    //整理盘口信息，使用主盘口的数据
     const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
     Object.assign(
         equals.game,
         pick(mainGame, 'lid', 'league', 'team_id_h', 'team_id_c', 'team_h', 'team_c'),
     )
-    return equals
+
+    //找到了盘口那么做赔率比对
+    if (!Decimal(equals.data.value).sub(surebet.surebet_value).gte(ready_condition)) {
+        //条件不满足
+        return {
+            ...equals,
+            pass: false,
+        }
+    } else {
+        return {
+            ...equals,
+            pass: true,
+        }
+    }
 }
 
 let lastMatchTime = 0
@@ -804,10 +779,10 @@ export async function startRobot() {
                 INNER JOIN
                     "odd" ON "odd"."match_id" = "match".id AND "odd"."status" = ?
                 WHERE
-                    "match"."match_time" > ? AND "match"."match_time" <= ? AND "match"."status" = ?
+                    "match"."match_time" > ? AND "match"."match_time" <= ?
                 LIMIT 1
                 `,
-                        values: ['ready', new Date(), new Date(Date.now() + 1200000), ''],
+                        values: ['ready', new Date(), new Date(Date.now() + 1200000)],
                     },
                     {
                         type: QueryTypes.SELECT,
@@ -822,103 +797,8 @@ export async function startRobot() {
                         const matches = await getCrownMatches()
                         let insertedCount = 0
                         for (const matchData of matches) {
-                            const timeMatch = /([0-9]+)-([0-9]+) ([0-9]+):([0-9]+)(a|p)/.exec(
-                                matchData.DATETIME,
-                            )!
+                            await Match.createMatch(matchData)
 
-                            let hour = parseInt(timeMatch[3])
-                            if (timeMatch[5] === 'p') {
-                                hour += 12
-                            }
-
-                            const baseTime = dayjs.tz(matchData.SYSTIME, 'America/New_York')
-                            let matchTime = dayjs.tz(
-                                `${baseTime.year()}-${timeMatch[1]}-${timeMatch[2]} ${hour.toString().padStart(2, '0')}:${timeMatch[4]}`,
-                                'America/New_York',
-                            )
-
-                            //比赛时间不应小于当前时间，否则就年份+1
-                            if (matchTime.valueOf() < baseTime.valueOf()) {
-                                matchTime = matchTime.add(1, 'year')
-                            }
-
-                            const exists = await Match.findOne({
-                                where: {
-                                    crown_match_id: matchData.ECID,
-                                },
-                                attributes: ['id', 'match_time'],
-                            })
-                            if (exists) {
-                                //更新比赛时间
-                                if (exists.match_time.valueOf() !== matchTime.valueOf()) {
-                                    await Match.update(
-                                        {
-                                            match_time: matchTime.toDate(),
-                                        },
-                                        {
-                                            where: {
-                                                id: exists.id,
-                                            },
-                                        },
-                                    )
-                                }
-                                continue
-                            }
-
-                            //查询联赛是否存在
-                            let tournament = await Tournament.findOne({
-                                where: {
-                                    crown_tournament_id: matchData.LID,
-                                },
-                                attributes: ['id'],
-                            })
-                            if (!tournament) {
-                                //保存联赛
-                                tournament = await Tournament.create({
-                                    crown_tournament_id: matchData.LID,
-                                    name: matchData.LEAGUE,
-                                })
-                            }
-
-                            //查询队伍是否存在
-                            let team1 = await Team.findOne({
-                                where: {
-                                    crown_team_id: matchData.TEAM_H_ID,
-                                },
-                                attributes: ['id'],
-                            })
-                            if (!team1) {
-                                team1 = await Team.create({
-                                    crown_team_id: matchData.TEAM_H_ID,
-                                    name: matchData.TEAM_H,
-                                })
-                            }
-                            let team2 = await Team.findOne({
-                                where: {
-                                    crown_team_id: matchData.TEAM_C_ID,
-                                },
-                                attributes: ['id'],
-                            })
-                            if (!team2) {
-                                team2 = await Team.create({
-                                    crown_team_id: matchData.TEAM_C_ID,
-                                    name: matchData.TEAM_C,
-                                })
-                            }
-
-                            //插入比赛
-                            await Match.create(
-                                {
-                                    crown_match_id: matchData.ECID,
-                                    team1_id: team1.id,
-                                    team2_id: team2.id,
-                                    tournament_id: tournament.id,
-                                    match_time: matchTime.toDate(),
-                                },
-                                {
-                                    returning: false,
-                                },
-                            )
                             insertedCount++
                         }
                         console.log('新增比赛数据', insertedCount)
