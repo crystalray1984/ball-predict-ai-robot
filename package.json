@@ -4,7 +4,8 @@
     "version": "1.0.0",
     "scripts": {
         "build": "rimraf dist && tsc",
-        "start": "yarn && yarn build && pm2-runtime start pm2.json"
+        "start": "yarn && yarn build && pm2-runtime start pm2.json",
+        "start:score": "yarn && yarn build && pm2-runtime start pm2-score.json"
     },
     "devDependencies": {
         "@tsconfig/node22": "^22.0.1",

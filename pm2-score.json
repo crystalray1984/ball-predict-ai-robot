@@ -1,0 +1,17 @@
+{
+    "apps": [
+        {
+            "name": "football-score",
+            "script": "./dist/score.js",
+            "env": {
+                "NODE_ENV": "production",
+                "TZ": "Asia/Shanghai"
+            },
+            "log_date_format": "YYYY-MM-DD HH:mm:ssZ",
+            "merge_logs": true,
+            "error_file": "./runtime/logs/error.log",
+            "out_file": "./runtime/logs/out.log",
+            "pid_file": "./runtime/football-robot.pid"
+        }
+    ]
+}
