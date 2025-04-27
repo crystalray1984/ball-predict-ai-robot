@@ -720,6 +720,7 @@ export async function startRobot() {
                 {
                     query: `
             SELECT
+                DISTINCT
                 "match".*
             FROM
                 "match"
