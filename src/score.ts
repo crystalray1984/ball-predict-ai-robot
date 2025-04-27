@@ -1,13 +1,13 @@
+import 'reflect-metadata'
+import './config'
+
 import axios from 'axios'
 import { load } from 'cheerio'
 import dayjs from 'dayjs'
-import Decimal from 'decimal.js'
 import { decode } from 'iconv-lite'
 import levenshtein from 'js-levenshtein'
-import { uniq } from 'lodash'
-import { Op } from 'sequelize'
+import { api } from './common/api'
 import { RateLimiter } from './common/rate-limit'
-import { Match, PromotedOdd, Team } from './db'
 
 const titan007Limiter = new RateLimiter(1000)
 
@@ -15,7 +15,7 @@ const titan007Limiter = new RateLimiter(1000)
  * 获取球探网的比赛结果
  * @param match_id 球探网比赛id
  */
-async function getScore(match_id: string) {
+async function getScore(match_id: string): Promise<MatchScore> {
     await titan007Limiter.add(() => {})
 
     //读取比分
@@ -55,11 +55,33 @@ async function getScore(match_id: string) {
     const $ = load(resp.data)
 
     const corner = $('#teamTechDiv > .lists').eq(0)
-    const corner1 = corner.find('.data span').eq(0).text()
-    const corner2 = corner.find('.data span').eq(2).text()
+    let corner1 = corner.find('.data span').eq(0).text()
+    let corner2 = corner.find('.data span').eq(2).text()
     const corner_period1 = $('#teamTechDiv > .lists').eq(1)
-    const corner1_period1 = corner_period1.find('.data span').eq(0).text()
-    const corner2_period1 = corner_period1.find('.data span').eq(2).text()
+    let corner1_period1 = corner_period1.find('.data span').eq(0).text()
+    let corner2_period1 = corner_period1.find('.data span').eq(2).text()
+
+    //如果没有获取到角球数据，统一视为0
+    if (corner1 === '') {
+        corner1 = '0'
+    }
+    if (corner2 === '') {
+        corner2 = '0'
+    }
+    if (corner1_period1 === '') {
+        corner1_period1 = '0'
+    }
+    if (corner2_period1 === '') {
+        corner2_period1 = '0'
+    }
+
+    console.log({
+        match_id,
+        corner1,
+        corner2,
+        corner1_period1,
+        corner2_period1,
+    })
 
     return {
         score1: parseInt(score1),
@@ -76,7 +98,7 @@ async function getScore(match_id: string) {
 /**
  * 从球探网获取所有完场比赛的id
  */
-async function getTodayMatches() {
+async function getTodayMatches(): Promise<Titan007MatchInfo[]> {
     await titan007Limiter.add(() => {})
     //读取赛程列表
     const resp = await axios.request({
@@ -158,7 +180,7 @@ async function getTodayMatches() {
 /**
  * 获取更早的比赛的id
  */
-async function getYesterdayMatches() {
+async function getYesterdayMatches(): Promise<Titan007MatchInfo[]> {
     await titan007Limiter.add(() => {})
 
     const today = dayjs().hour(0).minute(0).second(0).millisecond(0)
@@ -181,7 +203,7 @@ async function getYesterdayMatches() {
     const $ = load(html)
     const list = $('#table_live').find('tr[sid]')
 
-    const output: Awaited<ReturnType<typeof getTodayMatches>> = []
+    const output: Titan007MatchInfo[] = []
 
     const length = list.length
     for (let i = 0; i < length; i++) {
@@ -230,7 +252,7 @@ async function getYesterdayMatches() {
 /**
  * 计算完成比赛的赛果
  */
-async function getMatchesScore(matches: Match[]) {
+async function getMatchesScore(matches: BaseMatch[]): Promise<MatchScoreWithId[]> {
     let scoreData: Awaited<ReturnType<typeof getTodayMatches>>
     try {
         scoreData = await getTodayMatches()
@@ -241,16 +263,19 @@ async function getMatchesScore(matches: Match[]) {
         }
     } catch (err) {
         console.error(err)
-        return
+        return []
     }
 
+    const result: MatchScoreWithId[] = []
+
     for (const match of matches) {
-        const team1_name = match.team1.name.replace(/[()（）]|\s/g, '')
-        const team2_name = match.team2.name.replace(/[()（）]|\s/g, '')
+        const team1_name = match.team1.replace(/[()（）]|\s/g, '')
+        const team2_name = match.team2.replace(/[()（）]|\s/g, '')
+        const match_time = dayjs(match.match_time)
 
         //从完场比赛中找出相似度高且比赛时间高度接近的比赛
         const found = scoreData.find((row) => {
-            if (Math.abs(row.match_time - match.match_time.valueOf()) > 1800000) return false
+            if (Math.abs(row.match_time - match_time.valueOf()) > 1800000) return false
             const team1_match = (() => {
                 if (levenshtein(team1_name, row.team1) <= 3) {
                     return true
@@ -269,223 +294,61 @@ async function getMatchesScore(matches: Match[]) {
 
         if (!found) continue
 
-        let score: Awaited<ReturnType<typeof getScore>>
+        let score: MatchScore
         try {
             score = await getScore(found.match_id)
+            result.push({
+                ...score,
+                match_id: match.id,
+            })
         } catch (err) {
             console.error(err)
             continue
         }
-
-        //更新赛事结果
-        await Match.update(
-            {
-                ...score,
-                has_score: true,
-            },
-            {
-                where: {
-                    id: match.id,
-                },
-            },
-        )
-
-        //计算推荐赛事的结果
-        const odds = await PromotedOdd.findAll({
-            where: {
-                match_id: match.id,
-                is_valid: true,
-            },
-        })
-
-        if (odds.length > 0) {
-            for (const odd of odds) {
-                const result = getOddResult(score, odd)
-                if (result) {
-                    odd.score = result.score
-                    odd.result = result.result
-                    await odd.save()
-                }
-            }
-        }
-    }
-}
-
-function parseCondition(value: string) {
-    const returnValue = {
-        symbol: value.startsWith('-') ? '-' : '+',
-        value: [] as string[],
     }
 
-    value = Decimal(value).abs().toString()
-    if (value.endsWith('.25') || value.endsWith('.75')) {
-        const lowValue = Decimal(value).sub('0.25').toString()
-        const highValue = Decimal(value).add('0.25').toString()
-        returnValue.value = [lowValue, highValue]
-    } else {
-        returnValue.value = [value]
-    }
-
-    if (returnValue.symbol === '-' && returnValue.value.length > 1) {
-        returnValue.value.reverse()
-    }
-
-    return returnValue
+    return result
 }
 
 /**
- * 计算赛果
+ * 基础比赛数据
  */
-function getOddResult(match_score: Awaited<ReturnType<typeof getScore>>, odd: PromotedOdd) {
-    let score: {
-        score1: number
-        score2: number
-        total: number
-    }
-
-    if (odd.variety === 'goal') {
-        //进球
-        if (odd.period === 'period1') {
-            //上半场
-            score = {
-                score1: match_score.score1_period1,
-                score2: match_score.score2_period1,
-                total: match_score.score1_period1 + match_score.score2_period1,
-            }
-        } else {
-            //全场
-            score = {
-                score1: match_score.score1,
-                score2: match_score.score2,
-                total: match_score.score1 + match_score.score2,
-            }
-        }
-    } else if (odd.variety === 'corner') {
-        //角球
-        if (odd.period === 'period1') {
-            //上半场
-            score = {
-                score1: match_score.corner1_period1,
-                score2: match_score.corner2_period1,
-                total: match_score.corner1_period1 + match_score.corner2_period1,
-            }
-        } else {
-            //全场
-            score = {
-                score1: match_score.corner1,
-                score2: match_score.corner2,
-                total: match_score.corner1 + match_score.corner2,
-            }
-        }
-    } else {
-        return
-    }
-
-    //计算赛果
-    const condition = parseCondition(odd.condition)
-
-    if (odd.type === 'ah1') {
-        //主队
-        const score_parts = condition.value.map((adjust) => {
-            return condition.symbol === '-'
-                ? Decimal(score.score1).sub(adjust)
-                : Decimal(score.score1).add(adjust)
-        })
-
-        let result = score_parts.reduce<number>((lastValue, item) => {
-            return lastValue + item.comparedTo(score.score2)
-        }, 0)
-
-        result = result > 0 ? 1 : result < 0 ? -1 : 0
-
-        return {
-            score: `${score.score1}:${score.score2}`,
-            result,
-        }
-    } else if (odd.type === 'ah2') {
-        //客队
-        const score_parts = condition.value.map((adjust) => {
-            return condition.symbol === '-'
-                ? Decimal(score.score2).sub(adjust)
-                : Decimal(score.score2).add(adjust)
-        })
-
-        let result = score_parts.reduce<number>((lastValue, item) => {
-            return lastValue + item.comparedTo(score.score1)
-        }, 0)
-
-        result = result > 0 ? 1 : result < 0 ? -1 : 0
-
-        return {
-            score: `${score.score1}:${score.score2}`,
-            result,
-        }
-    } else if (odd.type === 'over') {
-        //大球
-        let result = condition.value.reduce<number>((lastValue, item) => {
-            return lastValue + Decimal(score.total).comparedTo(item)
-        }, 0)
-
-        result = result > 0 ? 1 : result < 0 ? -1 : 0
-
-        return {
-            score: score.total.toString(),
-            result,
-        }
-    } else if (odd.type === 'under') {
-        //小球
-        let result = condition.value.reduce<number>((lastValue, item) => {
-            return lastValue + Decimal(item).comparedTo(score.total)
-        }, 0)
-
-        result = result > 0 ? 1 : result < 0 ? -1 : 0
-
-        return {
-            score: score.total.toString(),
-            result,
-        }
-    }
+interface BaseMatch {
+    id: number
+    match_time: string
+    team1: string
+    team2: string
 }
 
-/**
- * 负责爬取赛果的脚本
- */
 export async function startScoreRobot() {
     const limiter = new RateLimiter(60000)
 
     while (true) {
         await limiter.add(() => {})
 
-        //读取待计算赛果的比赛
-        const matches = await Match.findAll({
-            where: {
-                status: 'final',
-                match_time: {
-                    [Op.lt]: new Date(Date.now() - 9000000),
-                    [Op.gte]: new Date(Date.now() - 2 * 86400000),
-                },
-                has_score: false,
-            },
-        })
+        try {
+            //读取待计算赛果的比赛
+            const retMatches = await api<BaseMatch[]>({
+                url: '/admin/match/require_score_list',
+            })
 
-        console.log('待计算赛果的比赛', matches.length)
-        if (matches.length === 0) continue
+            console.log('需要获取赛果的比赛', retMatches.data.length)
 
-        //读取队伍名称
-        const teams = await Team.findAll({
-            where: {
-                id: {
-                    [Op.in]: uniq(matches.map((t) => [t.team1_id, t.team2_id])).flat(),
-                },
-            },
-        })
+            if (retMatches.data.length === 0) {
+                continue
+            }
 
-        for (const match of matches) {
-            match.team1 = teams.find((t) => t.id === match.team1_id)!
-            match.team2 = teams.find((t) => t.id === match.team2_id)!
+            const result = await getMatchesScore(retMatches.data)
+            if (result.length > 0) {
+                //提交赛果数据
+                await api({
+                    url: '/admin/match/multi_set_score',
+                    data: result,
+                })
+            }
+        } catch (err) {
+            console.error(err)
         }
-
-        await getMatchesScore(matches)
     }
 }
 

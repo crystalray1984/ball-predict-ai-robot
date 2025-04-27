@@ -291,3 +291,41 @@ declare namespace Crown {
         game: Game[]
     }
 }
+
+declare interface ApiResp<T> {
+    code: number
+    msg: string
+    data: T
+}
+
+/**
+ * 单场比赛的赛果数据
+ */
+declare interface MatchScore {
+    score1: number
+    score2: number
+    score1_period1: number
+    score2_period1: number
+    corner1: number
+    corner2: number
+    corner1_period1: number
+    corner2_period1: number
+}
+
+/**
+ * 包含比赛id的单场赛果
+ */
+declare interface MatchScoreWithId extends MatchScore {
+    match_id: number
+}
+
+/**
+ * 球探网比赛信息
+ */
+declare interface Titan007MatchInfo {
+    match_id: string
+    time: Date
+    match_time: number
+    team1: string
+    team2: string
+}
