@@ -299,17 +299,23 @@ declare interface ApiResp<T> {
 }
 
 /**
+ * 比赛数据统计
+ */
+declare interface TechData {
+    corner1: number | null
+    corner2: number | null
+    corner1_period1: number | null
+    corner2_period1: number | null
+}
+
+/**
  * 单场比赛的赛果数据
  */
-declare interface MatchScore {
+declare interface MatchScore extends TechData {
     score1: number
     score2: number
     score1_period1: number
     score2_period1: number
-    corner1: number
-    corner2: number
-    corner1_period1: number
-    corner2_period1: number
 }
 
 /**
@@ -317,6 +323,7 @@ declare interface MatchScore {
  */
 declare interface MatchScoreWithId extends MatchScore {
     match_id: number
+    period1: boolean
 }
 
 /**
