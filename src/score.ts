@@ -75,14 +75,6 @@ async function getScore(match_id: string): Promise<MatchScore> {
         corner2_period1 = '0'
     }
 
-    console.log({
-        match_id,
-        corner1,
-        corner2,
-        corner1_period1,
-        corner2_period1,
-    })
-
     return {
         score1: parseInt(score1),
         score2: parseInt(score2),
@@ -273,30 +265,54 @@ async function getMatchesScore(matches: BaseMatch[]): Promise<MatchScoreWithId[]
         const team2_name = match.team2.replace(/[()（）]|\s/g, '')
         const match_time = dayjs(match.match_time)
 
-        //从完场比赛中找出相似度高且比赛时间高度接近的比赛
-        const found = scoreData.find((row) => {
+        //先寻找完全匹配的数据
+        let found = scoreData.find((row) => {
             if (Math.abs(row.match_time - match_time.valueOf()) > 1800000) return false
-            const team1_match = (() => {
-                if (levenshtein(team1_name, row.team1) <= 3) {
-                    return true
-                }
-                return false
-            })()
-            const team2_match = (() => {
-                if (levenshtein(team2_name, row.team2) <= 3) {
-                    return true
-                }
-                return false
-            })()
-            if (!team1_match || !team2_match) return false
-            return true
+
+            return team1_name === row.team1 && team2_name === row.team2
         })
+
+        if (!found) {
+            //再寻找高度相似的队伍
+            found = scoreData.find((row) => {
+                if (Math.abs(row.match_time - match_time.valueOf()) > 1800000) return false
+
+                let team1_level = Math.min(
+                    Math.max(Math.floor(Math.min(team1_name.length, row.team1.length) / 3), 1),
+                    2,
+                )
+                let team2_level = Math.min(
+                    Math.max(Math.floor(Math.min(team2_name.length, row.team2.length) / 3), 1),
+                    2,
+                )
+                const team1_match = (() => {
+                    if (levenshtein(team1_name, row.team1) <= team1_level) {
+                        return true
+                    }
+                    return false
+                })()
+                const team2_match = (() => {
+                    if (levenshtein(team2_name, row.team2) <= team2_level) {
+                        return true
+                    }
+                    return false
+                })()
+                if (!team1_match || !team2_match) return false
+                return true
+            })
+        }
 
         if (!found) continue
 
         let score: MatchScore
         try {
             score = await getScore(found.match_id)
+            console.log({
+                match_id: match.id,
+                match: `${team1_name} vs ${team2_name}`,
+                found: `${found.team1} vs ${found.team2}`,
+                ...score,
+            })
             result.push({
                 ...score,
                 match_id: match.id,
@@ -362,3 +378,14 @@ if (require.main === module) {
             process.exit()
         })
 }
+// if (require.main === module) {
+//     getScore('2616747')
+//         .then((ret) => {
+//             console.log(ret)
+//             process.exit()
+//         })
+//         .catch((err) => {
+//             console.error(err)
+//             process.exit()
+//         })
+// }
