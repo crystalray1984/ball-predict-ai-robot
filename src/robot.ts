@@ -160,7 +160,8 @@ async function processNearlyMatch(match: Match) {
                 await Odd.update(
                     {
                         status: pass ? 'promoted' : 'skip',
-                        crown_value2: data.special ? data.data.value : null,
+                        crown_value2: data.data.value,
+                        crown_condition2: data.data.condition,
                     },
                     {
                         where: {
@@ -215,6 +216,7 @@ async function processNearlyMatch(match: Match) {
                     {
                         status: 'ignored',
                         crown_value2: data.data.value,
+                        crown_condition2: data.data.condition,
                     },
                     {
                         where: {
@@ -487,9 +489,8 @@ async function compareFinalData(
     }
 
     //首先通过读取一些配置值
-    const { promote_condition, allow_promote_1, promote_symbol } = await getSetting<string>(
+    const { promote_condition, promote_symbol } = await getSetting<string>(
         'promote_condition',
-        'allow_promote_1',
         'promote_symbol',
     )
 
@@ -555,10 +556,11 @@ async function compareFinalData(
     }
 
     //没有对应盘口的时候判断一下开关
-    if (!allow_promote_1) return
+    // if (!allow_promote_1) return
 
     //没有从最终盘口中找到原来对应的盘口，那么对其他盘口进行判断
     const result: { game: Crown.Game; data: MatchGameData }[] = []
+    let sortType: 'asc' | 'desc' = 'desc'
     for (const game of games) {
         //寻找类型相同的盘口
         const data = getGameData(surebet.type, game)
@@ -568,32 +570,47 @@ async function compareFinalData(
         switch (surebet.type.type) {
             case 'ah1':
             case 'ah2':
+                sortType = 'asc'
                 //让球，如果让球方让球变小，或者受让方受让变大，那么可以反向推荐
                 //负数绝对值变小，正数绝对值变大，就是数值变大
-                if (Decimal(data.condition).gt(surebet.type.condition!)) {
-                    result.push({
-                        game,
-                        data,
-                    })
-                }
+                result.push({
+                    game,
+                    data,
+                })
+                // if (Decimal(data.condition).gt(surebet.type.condition!)) {
+                //     result.push({
+                //         game,
+                //         data,
+                //     })
+                // }
                 break
             case 'under':
                 //大小球-小球，如果大球变大，那么可以反向推荐
-                if (Decimal(data.condition).gt(surebet.type.condition!)) {
-                    result.push({
-                        game,
-                        data,
-                    })
-                }
+                sortType = 'asc'
+                result.push({
+                    game,
+                    data,
+                })
+                // if (Decimal(data.condition).gt(surebet.type.condition!)) {
+                //     result.push({
+                //         game,
+                //         data,
+                //     })
+                // }
                 break
             case 'over':
                 //大小球-大球，如果大球变小，那么可以反向推荐
-                if (Decimal(data.condition).lt(surebet.type.condition!)) {
-                    result.push({
-                        game,
-                        data,
-                    })
-                }
+                sortType = 'desc'
+                result.push({
+                    game,
+                    data,
+                })
+                // if (Decimal(data.condition).lt(surebet.type.condition!)) {
+                //     result.push({
+                //         game,
+                //         data,
+                //     })
+                // }
                 break
         }
     }
@@ -602,7 +619,31 @@ async function compareFinalData(
         return
     }
 
-    const specialResult = result[0]
+    let specialResult: { game: Crown.Game; data: MatchGameData } | undefined = undefined
+    let pass = true
+
+    //对结果进行排序
+    if (sortType === 'asc') {
+        //正序排列
+        result.sort((row1, row2) => {
+            return Decimal(row1.data.condition).comparedTo(row2.data.condition)
+        })
+        specialResult = result.find((t) => Decimal(t.data.condition).gt(surebet.type.condition!))
+        if (!specialResult) {
+            specialResult = result[result.length - 1]
+            pass = false
+        }
+    } else {
+        //倒序排列
+        result.sort((row1, row2) => {
+            return Decimal(row2.data.condition).comparedTo(row1.data.condition)
+        })
+        specialResult = result.find((t) => Decimal(t.data.condition).lt(surebet.type.condition!))
+        if (!specialResult) {
+            specialResult = result[result.length - 1]
+            pass = false
+        }
+    }
 
     //返回的信息使用主盘口的
     const mainGame = crown.game.filter((game) => game.ptype_id == '0')[0] ?? crown.game[0]
@@ -613,7 +654,7 @@ async function compareFinalData(
 
     return {
         ...specialResult,
-        pass: true,
+        pass,
         special: 1,
     }
 }
