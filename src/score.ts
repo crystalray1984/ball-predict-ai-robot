@@ -368,10 +368,18 @@ async function getTodayMatches() {
     )
 
     const formatMatch = (row: string[]) => {
-        const dateParts = row[12].split(',')
+        const date_sl = row[11].split(':')
+        const date_sl2 = row[36].split('-')
         const time = new Date(
-            Date.parse(`${dateParts[0]}/${parseInt(dateParts[1]) + 1}/${dateParts[2]} ${row[11]}`),
+            parseInt(row[43]),
+            parseInt(date_sl2[0]) - 1,
+            parseInt(date_sl2[1]),
+            parseInt(date_sl[0]),
+            parseInt(date_sl[1]),
+            0,
+            0,
         )
+
         const team1_id = row[37]
         const team2_id = row[38]
 
