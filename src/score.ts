@@ -486,8 +486,8 @@ async function getYesterdayMatches(): Promise<Titan007MatchInfo[]> {
 }
 
 if (require.main === module) {
-    // startScoreRobot()
-    getMatchScore('2621358')
+    startScoreRobot()
+        //getMatchScore('2621358')
         .then((data) => {
             console.log(data)
             process.exit()
