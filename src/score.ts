@@ -60,8 +60,8 @@ export async function startScoreRobot() {
 async function processMatchesScore(matches: BaseMatch[]): Promise<MatchScoreWithId[]> {
     let { finish, period1 } = await getTodayMatches()
 
-    if (new Date().getHours() >= 3) {
-        //如果超过了凌晨3点，且需要获取赛果的比赛中有全场的，那么也同时抓取昨天的数据
+    if (new Date().getHours() >= 12 && matches.some((t) => !t.period1)) {
+        //如果超过了中午12点，且需要获取赛果的比赛中有全场的，那么也同时抓取昨天的数据
         const yesterdayList = await getYesterdayMatches()
         console.log('抓取到昨日完场比赛', yesterdayList.length)
         finish = finish.concat(yesterdayList)
@@ -411,75 +411,85 @@ async function getTodayMatches() {
 async function getYesterdayMatches(): Promise<Titan007MatchInfo[]> {
     await titan007Limiter.add(() => {})
 
-    const today = dayjs().hour(0).minute(0).second(0).millisecond(0)
+    try {
+        const today = dayjs().hour(0).minute(0).second(0).millisecond(0)
 
-    const yesterday = today.clone().add(-1, 'day')
+        const yesterday = today.clone().add(-1, 'day')
 
-    //读取赛程列表
-    const resp = await axios.request({
-        url: `https://bf.titan007.com/football/hg/Over_${yesterday.format('YYYYMMDD')}.htm?finCookie=1`,
-        headers: {
-            Referer: 'https://live.titan007.com/oldIndexall.aspx',
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0',
-        },
-        responseType: 'arraybuffer',
-    })
-
-    const html = decode(resp.data, 'GBK')
-
-    const $ = load(html)
-    const list = $('#table_live').find('tr[sid]')
-
-    const output: Titan007MatchInfo[] = []
-
-    const length = list.length
-    for (let i = 0; i < length; i++) {
-        const tr = list.eq(i)
-
-        //解析时间
-        const timeStr = tr.find('td').eq(1).text()
-        const match = /([0-9]+)日([0-9]+):([0-9]+)/.exec(timeStr)
-        if (!match) continue
-        const date = parseInt(match[1])
-        let time: Date
-        if (date === today.date()) {
-            //今天
-            time = today.clone().hour(parseInt(match[2])).minute(parseInt(match[3])).toDate()
-        } else {
-            //昨天
-            time = yesterday.clone().hour(parseInt(match[2])).minute(parseInt(match[3])).toDate()
-        }
-
-        const team1Cell = tr.find('td').eq(3)
-        team1Cell.find('*').remove()
-        const team1 = team1Cell
-            .text()
-            .trim()
-            .replace(/[()（）]|\s/g, '')
-
-        const team2Cell = tr.find('td').eq(5)
-        team2Cell.find('*').remove('*')
-        const team2 = team2Cell
-            .text()
-            .trim()
-            .replace(/[()（）]|\s/g, '')
-
-        output.push({
-            match_id: tr.attr('sid')!,
-            time,
-            match_time: time.valueOf(),
-            team1,
-            team2,
+        //读取赛程列表
+        const resp = await axios.request({
+            url: `https://bf.titan007.com/football/hg/Over_${yesterday.format('YYYYMMDD')}.htm?finCookie=1`,
+            headers: {
+                Referer: 'https://live.titan007.com/oldIndexall.aspx',
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0',
+            },
+            responseType: 'arraybuffer',
         })
-    }
 
-    return output
+        const html = decode(resp.data, 'GBK')
+
+        const $ = load(html)
+        const list = $('#table_live').find('tr[sid]')
+
+        const output: Titan007MatchInfo[] = []
+
+        const length = list.length
+        for (let i = 0; i < length; i++) {
+            const tr = list.eq(i)
+
+            //解析时间
+            const timeStr = tr.find('td').eq(1).text()
+            const match = /([0-9]+)日([0-9]+):([0-9]+)/.exec(timeStr)
+            if (!match) continue
+            const date = parseInt(match[1])
+            let time: Date
+            if (date === today.date()) {
+                //今天
+                time = today.clone().hour(parseInt(match[2])).minute(parseInt(match[3])).toDate()
+            } else {
+                //昨天
+                time = yesterday
+                    .clone()
+                    .hour(parseInt(match[2]))
+                    .minute(parseInt(match[3]))
+                    .toDate()
+            }
+
+            const team1Cell = tr.find('td').eq(3)
+            team1Cell.find('*').remove()
+            const team1 = team1Cell
+                .text()
+                .trim()
+                .replace(/[()（）]|\s/g, '')
+
+            const team2Cell = tr.find('td').eq(5)
+            team2Cell.find('*').remove('*')
+            const team2 = team2Cell
+                .text()
+                .trim()
+                .replace(/[()（）]|\s/g, '')
+
+            output.push({
+                match_id: tr.attr('sid')!,
+                time,
+                match_time: time.valueOf(),
+                team1,
+                team2,
+            })
+        }
+        return output
+    } catch (err) {
+        console.error(err)
+        return []
+    }
 }
 
 if (require.main === module) {
-    startScoreRobot()
-        .then(() => {
+    // startScoreRobot()
+    getMatchScore('2621358')
+        .then((data) => {
+            console.log(data)
             process.exit()
         })
         .catch((err) => {
