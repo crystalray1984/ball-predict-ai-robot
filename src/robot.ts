@@ -92,14 +92,21 @@ async function processOdd(row: Surebet.OutputData) {
  */
 async function processNearlyMatch(match: Match) {
     //读取配置
-    const { corner_enable, corner_reverse, promote_reverse, period1_enable, filter_rate } =
-        await getSetting(
-            'corner_enable',
-            'corner_reverse',
-            'promote_reverse',
-            'period1_enable',
-            'filter_rate',
-        )
+    const {
+        corner_enable,
+        corner_period1_enable,
+        corner_reverse,
+        promote_reverse,
+        period1_enable,
+        filter_rate,
+    } = await getSetting(
+        'corner_enable',
+        'corner_reverse',
+        'promote_reverse',
+        'period1_enable',
+        'filter_rate',
+        'corner_period1_enable',
+    )
 
     //抓取皇冠数据
     const crownData = await getCrownData(match.crown_match_id.toString(), 'today')
@@ -109,7 +116,7 @@ async function processNearlyMatch(match: Match) {
 
     //对比赛中的每个盘口进行比对
     for (const odd of match.odds) {
-        //第一波过滤，参数过滤
+        //计算过滤参数
         const pass = (() => {
             if (!corner_enable && odd.variety === 'corner') {
                 //角球过滤
@@ -119,34 +126,49 @@ async function processNearlyMatch(match: Match) {
                 //上半场过滤
                 return false
             }
+            if (odd.variety === 'corner' && odd.period === 'period1' && !corner_period1_enable) {
+                //上半场角球过滤
+                return false
+            }
 
             return true
         })()
 
-        if (pass) {
-            //所有数据都通过，才进行数据比对
-            //构建数据
-            const oddData: Surebet.OutputData = {
-                crown_match_id: match.crown_match_id.toString(),
-                match_time: match.match_time.valueOf(),
-                surebet_value: odd.surebet_value,
-                type: {
-                    game: 'regular',
-                    base: 'overall',
-                    variety: odd.variety,
-                    period: odd.period,
-                    type: odd.type,
-                    condition: odd.condition,
-                },
-            }
+        //构建数据
+        const oddData: Surebet.OutputData = {
+            crown_match_id: match.crown_match_id.toString(),
+            match_time: match.match_time.valueOf(),
+            surebet_value: odd.surebet_value,
+            type: {
+                game: 'regular',
+                base: 'overall',
+                variety: odd.variety,
+                period: odd.period,
+                type: odd.type,
+                condition: odd.condition,
+            },
+        }
 
-            //最终数据比对
-            const data = await compareFinalData(oddData, crownData)
+        //最终数据比对
+        const data = await compareFinalData(oddData, crownData)
 
-            if (data) {
-                //有满足条件的数据
-                if (data.pass) {
-                    //比对的结果符合条件
+        if (data) {
+            //有满足条件的数据
+            if (data.pass) {
+                //比对的结果符合条件
+                //标记盘口为比对成功
+                await Odd.update(
+                    {
+                        status: pass ? 'promoted' : 'skip',
+                        crown_value2: data.special ? data.data.value : null,
+                    },
+                    {
+                        where: {
+                            id: odd.id,
+                        },
+                    },
+                )
+                if (pass) {
                     //计算推荐数据
                     const { condition, type, back } = (() => {
                         //是否反向推荐
@@ -186,38 +208,13 @@ async function processNearlyMatch(match: Match) {
                         special: data.special ?? 0,
                         special_odd: data.special ? JSON.stringify(data.data) : null,
                     })
-
-                    //标记盘口为比对成功
-                    await Odd.update(
-                        {
-                            status: 'promoted',
-                            crown_value2: data.special ? data.data.value : null,
-                        },
-                        {
-                            where: {
-                                id: odd.id,
-                            },
-                        },
-                    )
-                } else {
-                    //比对的结果不符合条件
-                    await Odd.update(
-                        {
-                            status: 'ignored',
-                            crown_value2: data.data.value,
-                        },
-                        {
-                            where: {
-                                id: odd.id,
-                            },
-                        },
-                    )
                 }
             } else {
                 //比对的结果不符合条件
                 await Odd.update(
                     {
                         status: 'ignored',
+                        crown_value2: data.data.value,
                     },
                     {
                         where: {
@@ -227,7 +224,7 @@ async function processNearlyMatch(match: Match) {
                 )
             }
         } else {
-            //不需要比对，直接放弃的盘口
+            //比对的结果不符合条件
             await Odd.update(
                 {
                     status: 'ignored',
