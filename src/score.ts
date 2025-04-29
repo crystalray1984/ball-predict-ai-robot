@@ -374,7 +374,8 @@ async function getTodayMatches() {
         )
         const team1_id = row[37]
         const team2_id = row[38]
-        return {
+
+        const result = {
             match_id: row[0],
             time,
             match_time: time.valueOf(),
@@ -385,6 +386,10 @@ async function getTodayMatches() {
                 alias[team2_id] ??
                 row[8].replace(/<font.+?<\/font>/i, '').replace(/[()（）]|\s/g, ''),
         }
+
+        console.log(result.time, result.team1, result.team2)
+
+        return result
     }
 
     //对比赛进行筛选，只留下完场的比赛
