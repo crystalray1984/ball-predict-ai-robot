@@ -184,13 +184,14 @@ async function processNearlyMatch(match: Match) {
                         type,
                         back,
                         special: data.special ?? 0,
+                        special_odd: data.special ? JSON.stringify(data.data) : null,
                     })
 
                     //标记盘口为比对成功
                     await Odd.update(
                         {
                             status: 'promoted',
-                            crown_value2: data.data.value,
+                            crown_value2: data.special ? data.data.value : null,
                         },
                         {
                             where: {
@@ -212,6 +213,18 @@ async function processNearlyMatch(match: Match) {
                         },
                     )
                 }
+            } else {
+                //比对的结果不符合条件
+                await Odd.update(
+                    {
+                        status: 'ignored',
+                    },
+                    {
+                        where: {
+                            id: odd.id,
+                        },
+                    },
+                )
             }
         } else {
             //不需要比对，直接放弃的盘口

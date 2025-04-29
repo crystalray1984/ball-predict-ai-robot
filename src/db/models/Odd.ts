@@ -67,7 +67,7 @@ export class Odd extends Model<InferAttributes<Odd>, InferCreationAttributes<Odd
      * 第二次比对皇冠水位
      */
     @Column(DataType.DECIMAL(10, 4))
-    declare crown_value2: CreationOptional<string>
+    declare crown_value2: CreationOptional<string | null>
 
     /**
      * 盘口状态

@@ -59,6 +59,12 @@ export class PromotedOdd extends Model<
     declare special: CreationOptional<number>
 
     /**
+     * 特殊规则用于判断的变盘
+     */
+    @Column(DataType.TEXT)
+    declare special_odd: CreationOptional<string | null>
+
+    /**
      * 记录创建时间
      */
     @CreatedAt
