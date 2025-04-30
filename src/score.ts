@@ -203,7 +203,6 @@ async function getTechDataFromJs(match_id: string): Promise<TechData> {
         }
     })
 
-    console.log(data[match_id])
     if (!Array.isArray(data[match_id])) {
         return await getTechDataFromHtml(match_id)
     }
@@ -410,8 +409,6 @@ async function getTodayMatches() {
                 alias[team2_id] ??
                 row[8].replace(/<font.+?<\/font>/i, '').replace(/[()（）]|\s/g, ''),
         }
-
-        console.log(result.time, result.team1, result.team2, parseInt(row[13]))
 
         return result
     }
