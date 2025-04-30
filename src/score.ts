@@ -160,6 +160,21 @@ async function getMatchScore(match_id: string): Promise<MatchScore> {
  * @param match_id
  */
 async function getTechData(match_id: string): Promise<TechData> {
+    //先尝试通过页面获取
+    const htmlData = await getTechDataFromHtml(match_id)
+    if (Object.values(htmlData).some((t) => t === null)) {
+        //再尝试通过JS获取
+        const jsData = await getTechDataFromJs(match_id)
+        Object.entries(htmlData).forEach(([key, value]) => {
+            if (value === null && typeof jsData[key as keyof TechData] === 'number') {
+                htmlData[key as keyof TechData] = jsData[key as keyof TechData]
+            }
+        })
+    }
+    return htmlData
+}
+
+async function getTechDataFromJs(match_id: string): Promise<TechData> {
     await titan007Limiter.add(() => {})
     const resp = await axios.request({
         url: 'https://livestatic.titan007.com/vbsxml/detailin.js',
@@ -188,6 +203,7 @@ async function getTechData(match_id: string): Promise<TechData> {
         }
     })
 
+    console.log(data[match_id])
     if (!Array.isArray(data[match_id])) {
         return await getTechDataFromHtml(match_id)
     }
@@ -204,7 +220,7 @@ async function getTechData(match_id: string): Promise<TechData> {
     }
 
     const row1 = data[match_id].find((t) => t[0] === 1)
-    if (row0) {
+    if (row1) {
         corner1_period1 = parseInt(row1[1])
         corner2_period1 = parseInt(row1[2])
     }
