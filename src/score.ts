@@ -60,7 +60,7 @@ export async function startScoreRobot() {
 async function processMatchesScore(matches: BaseMatch[]): Promise<MatchScoreWithId[]> {
     let { finish, period1 } = await getTodayMatches()
 
-    if (new Date().getHours() >= 12 && matches.some((t) => !t.period1)) {
+    if (new Date().getHours() >= 8 && matches.some((t) => !t.period1)) {
         //如果超过了中午12点，且需要获取赛果的比赛中有全场的，那么也同时抓取昨天的数据
         const yesterdayList = await getYesterdayMatches()
         console.log('抓取到昨日完场比赛', yesterdayList.length)
