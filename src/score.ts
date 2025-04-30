@@ -395,7 +395,7 @@ async function getTodayMatches() {
                 row[8].replace(/<font.+?<\/font>/i, '').replace(/[()（）]|\s/g, ''),
         }
 
-        console.log(result.time, result.team1, result.team2)
+        console.log(result.time, result.team1, result.team2, parseInt(row[13]))
 
         return result
     }
