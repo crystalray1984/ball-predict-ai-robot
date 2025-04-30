@@ -464,6 +464,10 @@ async function getYesterdayMatches(): Promise<Titan007MatchInfo[]> {
         for (let i = 0; i < length; i++) {
             const tr = list.eq(i)
 
+            //判断是否完场
+            const stateStr = tr.find('td').eq(2).text().trim()
+            if (stateStr !== '完') continue
+
             //解析时间
             const timeStr = tr.find('td').eq(1).text()
             const match = /([0-9]+)日([0-9]+):([0-9]+)/.exec(timeStr)
