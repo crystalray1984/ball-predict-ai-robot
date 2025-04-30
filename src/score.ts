@@ -46,6 +46,7 @@ export async function startScoreRobot() {
                     url: '/admin/match/multi_set_score',
                     data: results,
                 })
+                console.log(results)
                 console.log('赛果设置结果', pick(ret, 'code', 'msg'))
             }
         } catch (err) {
