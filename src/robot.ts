@@ -173,10 +173,21 @@ async function processNearlyMatch(match: Match) {
                     //计算推荐数据
                     const { condition, type, back } = (() => {
                         //是否反向推荐
-                        const back =
+                        let back =
                             odd.variety === 'corner'
                                 ? (corner_reverse ?? false)
                                 : (promote_reverse ?? false)
+
+                        //特殊逻辑，上半场进球大1，那么无论是什么设置都是正推
+                        if (
+                            odd.period === 'period1' &&
+                            odd.condition === '1' &&
+                            odd.variety === 'goal' &&
+                            odd.type === 'over'
+                        ) {
+                            back = false
+                        }
+
                         if (!back) {
                             //直接正向推荐
                             return { condition: odd.condition, type: odd.type, back }
