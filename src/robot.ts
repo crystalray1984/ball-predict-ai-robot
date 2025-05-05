@@ -99,6 +99,7 @@ async function processNearlyMatch(match: Match) {
         promote_reverse,
         period1_enable,
         filter_rate,
+        special_reverse,
     } = await getSetting(
         'corner_enable',
         'corner_reverse',
@@ -106,6 +107,7 @@ async function processNearlyMatch(match: Match) {
         'period1_enable',
         'filter_rate',
         'corner_period1_enable',
+        'special_reverse',
     )
 
     //抓取皇冠数据
@@ -178,14 +180,36 @@ async function processNearlyMatch(match: Match) {
                                 ? (corner_reverse ?? false)
                                 : (promote_reverse ?? false)
 
-                        //特殊逻辑，上半场进球大1，那么无论是什么设置都是正推
-                        if (
-                            odd.period === 'period1' &&
-                            odd.condition === '1' &&
-                            odd.variety === 'goal' &&
-                            odd.type === 'over'
-                        ) {
-                            back = false
+                        //特殊正反推逻辑
+                        if (special_reverse) {
+                            const special = (special_reverse as SpecialReverseRule[]).find(
+                                (config) => {
+                                    if (
+                                        config.period === odd.period &&
+                                        config.variety === odd.variety &&
+                                        config.type === odd.type
+                                    ) {
+                                        return false
+                                    }
+
+                                    switch (config.condition_symbol) {
+                                        case '<':
+                                            return Decimal(odd.condition).lt(config.condition)
+                                        case '<=':
+                                            return Decimal(odd.condition).lte(config.condition)
+                                        case '>':
+                                            return Decimal(odd.condition).gt(config.condition)
+                                        case '>=':
+                                            return Decimal(odd.condition).gte(config.condition)
+                                        default:
+                                            return Decimal(odd.condition).eq(config.condition)
+                                    }
+                                },
+                            )
+
+                            if (special) {
+                                back = special.back
+                            }
                         }
 
                         if (!back) {

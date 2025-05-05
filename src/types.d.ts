@@ -336,3 +336,58 @@ declare interface Titan007MatchInfo {
     team1: string
     team2: string
 }
+
+/**
+ * 特殊正反推逻辑
+ */
+declare interface SpecialReverseRule {
+    /** 投注类型对应的条件；描述投注的额外变量参数 */
+    condition: string
+
+    /**
+     * 条件对应的符号
+     */
+    condition_symbol: '=' | '<' | '>' | '<=' | '>='
+
+    /**
+    一种可以计数的比赛结果类型，用于接受投注。
+    进球、角球、牌、局、盘、点等都属于 "variety"。
+    */
+    variety: string
+
+    /**
+    接受投注的时间段或比赛部分。
+    例如：加时赛、常规时间、第一节、第一盘等都属于 "periods"。
+    */
+    period: string
+
+    /**
+    此参数描述投注的逻辑含义，可以取以下值：
+    win1 - 球队1获胜。
+    win1RetX - 球队1获胜，但如果打平，投注退款。
+    win2 - 球队2获胜。
+    win2RetX - 球队2获胜，但如果打平，投注退款。
+    draw - 平局。
+    over - 大。
+    under - 小。
+    yes - 发生。
+    no - 不发生。
+    odd - 单数。
+    even - 双数。
+    ah1 - 球队1的亚洲让分。
+    ah2 - 球队2的亚洲让分。
+    eh1 - 球队1的欧洲让分。
+    ehx - 平局的欧洲让分。
+    eh2 - 球队2的欧洲让分。
+
+    等等。
+    某些投注类型可能包含额外条件。 例如，对于大于和小于的投注，它是总数，
+    对于ah1/ah2/eh1/ehx/eh2的投注，它是让球值。 所有这些值将包含在单独的 condition 参数中。
+    */
+    type: string
+
+    /**
+     * 是否反推
+     */
+    back: boolean
+}
