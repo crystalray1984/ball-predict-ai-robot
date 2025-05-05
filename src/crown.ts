@@ -64,7 +64,19 @@ export async function init() {
         args: ['--no-sandbox', '--disable-images', '--lang zh-cn'],
     })
 
-    const page = await browser.newPage()
+    let page: Page
+    if (process.env.CROWN_PROXY) {
+        //使用代理
+        const context = await browser.createBrowserContext({
+            proxyServer: process.env.CROWN_PROXY,
+        })
+        page = await context.newPage()
+    } else {
+        //不使用代理
+        page = await browser.newPage()
+    }
+
+    // const page = await browser.newPage()
     await page.goto(PAGE_URL)
     console.log('page navigated')
 
