@@ -185,9 +185,11 @@ async function processNearlyMatch(match: Match) {
                             const special = (special_reverse as SpecialReverseRule[]).find(
                                 (config) => {
                                     if (
-                                        config.period === odd.period &&
-                                        config.variety === odd.variety &&
-                                        config.type === odd.type
+                                        !(
+                                            config.period === odd.period &&
+                                            config.variety === odd.variety &&
+                                            config.type === odd.type
+                                        )
                                     ) {
                                         return false
                                     }
