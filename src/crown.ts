@@ -6,6 +6,7 @@ import { XMLParser } from 'fast-xml-parser'
 import { URL } from 'node:url'
 import puppeteer, { Browser, Page } from 'puppeteer'
 import { delay } from './common/helpers'
+import { getProxy } from './proxy'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -60,8 +61,12 @@ export async function init() {
     }
 
     const args: string[] = ['--no-sandbox', '--disable-images', '--lang=zh-cn']
-    if (process.env.CROWN_PROXY) {
-        args.push(`--proxy-server="${process.env.CROWN_PROXY}"`)
+
+    const proxy = await getProxy()
+
+    if (proxy) {
+        console.log('proxy', proxy)
+        args.push(`--proxy-server="${proxy}"`)
     }
 
     browser = await puppeteer.launch({
