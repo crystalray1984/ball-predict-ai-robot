@@ -59,24 +59,17 @@ export async function init() {
         browser = undefined as unknown as Browser
     }
 
-    browser = await puppeteer.launch({
-        // headless: false,
-        args: ['--no-sandbox', '--disable-images', '--lang zh-cn'],
-    })
-
-    let page: Page
+    const args: string[] = ['--no-sandbox', '--disable-images', '--lang=zh-cn']
     if (process.env.CROWN_PROXY) {
-        //使用代理
-        const context = await browser.createBrowserContext({
-            proxyServer: process.env.CROWN_PROXY,
-        })
-        page = await context.newPage()
-    } else {
-        //不使用代理
-        page = await browser.newPage()
+        args.push(`--proxy-server="${process.env.CROWN_PROXY}"`)
     }
 
-    // const page = await browser.newPage()
+    browser = await puppeteer.launch({
+        // headless: false,
+        args,
+    })
+
+    const page = await browser.newPage()
     await page.goto(PAGE_URL)
     console.log('page navigated')
 
