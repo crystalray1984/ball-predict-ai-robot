@@ -4,6 +4,10 @@ import axios from 'axios'
  * 获取代理
  */
 export async function getProxy(): Promise<string | undefined> {
+    if (process.env.CROWN_PROXY_URL) {
+        return process.env.CROWN_PROXY_URL
+    }
+
     if (!process.env.CROWN_PROXY) {
         return
     }
