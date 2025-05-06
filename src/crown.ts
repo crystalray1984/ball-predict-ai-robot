@@ -66,7 +66,7 @@ export async function init() {
 
     if (proxy) {
         console.log('proxy', proxy)
-        args.push(`--proxy-server="${proxy}"`)
+        args.push(`--proxy-server=${proxy}`)
     }
 
     browser = await puppeteer.launch({
