@@ -336,7 +336,7 @@ async function processNearlyMatch(match: Match) {
                 is_valid = count % 2 === 0
                 //4场推2场
                 break
-            case 2:
+            case 3:
                 //4场推3场
                 is_valid = count % 4 !== 3
                 break
