@@ -819,7 +819,7 @@ export async function startRobot() {
             ORDER BY
                 "match"."match_time"
             `,
-                    values: ['ready', new Date(), new Date(Date.now() + 120000), ''],
+                    values: ['ready', new Date(), new Date(Date.now() + 300000), ''],
                 },
                 {
                     type: QueryTypes.SELECT,
@@ -827,7 +827,7 @@ export async function startRobot() {
                 },
             )
 
-            console.log('2分钟内开赛的比赛', nearlyMatches.length)
+            console.log('5分钟内开赛的比赛', nearlyMatches.length)
 
             if (nearlyMatches.length > 0) {
                 const odds = await Odd.findAll({
@@ -839,7 +839,7 @@ export async function startRobot() {
                     },
                 })
 
-                console.log('2分钟内开赛的盘口', odds.length)
+                console.log('5分钟内开赛的盘口', odds.length)
 
                 nearlyMatches.forEach((match) => {
                     match.odds = odds.filter((t) => t.match_id === match.id)
