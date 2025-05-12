@@ -1,0 +1,141 @@
+import type { CreationOptional, InferAttributes, InferCreationAttributes } from 'sequelize'
+import {
+    AutoIncrement,
+    Column,
+    CreatedAt,
+    DataType,
+    Model,
+    PrimaryKey,
+    Table,
+    UpdatedAt,
+} from 'sequelize-typescript'
+
+/**
+ * 比赛表
+ */
+@Table({ tableName: 'match' })
+export class Match extends Model<InferAttributes<Match>, InferCreationAttributes<Match>> {
+    /**
+     * 比赛id
+     */
+    @AutoIncrement
+    @PrimaryKey
+    @Column(DataType.INTEGER)
+    declare id: CreationOptional<number>
+
+    /**
+     * 联赛id
+     */
+    @Column(DataType.INTEGER)
+    declare tournament_id: number
+
+    /**
+     * 皇冠比赛id
+     */
+    @Column(DataType.STRING)
+    declare crown_match_id: string
+
+    /**
+     * 球探网比赛id
+     */
+    @Column(DataType.STRING)
+    declare titan007_match_id: CreationOptional<string>
+
+    /**
+     * 主队id
+     */
+    @Column(DataType.INTEGER)
+    declare team1_id: number
+
+    /**
+     * 客队id
+     */
+    @Column(DataType.INTEGER)
+    declare team2_id: number
+
+    /**
+     * 比赛时间
+     */
+    @Column(DataType.DATE)
+    declare match_time: Date
+
+    /**
+     * 比赛状态
+     */
+    @Column(DataType.STRING)
+    declare status: CreationOptional<MatchStatus>
+
+    /**
+     * 比赛异常状态
+     */
+    @Column(DataType.STRING)
+    declare error_status: CreationOptional<MatchErrorStatus>
+
+    /**
+     * 是否已有上半场赛果
+     */
+    @Column(DataType.TINYINT)
+    declare has_period1_score: CreationOptional<number>
+
+    /**
+     * 主队上半场进球
+     */
+    @Column(DataType.INTEGER)
+    declare score1_period1: CreationOptional<number | null>
+
+    /**
+     * 客队上半场进球
+     */
+    @Column(DataType.INTEGER)
+    declare score2_period1: CreationOptional<number | null>
+
+    /**
+     * 主队上半场角球
+     */
+    @Column(DataType.INTEGER)
+    declare corner1_period1: CreationOptional<number | null>
+
+    /**
+     * 客队上半场角球
+     */
+    @Column(DataType.INTEGER)
+    declare corner2_period1: CreationOptional<number | null>
+
+    /**
+     * 是否已有赛果
+     */
+    @Column(DataType.TINYINT)
+    declare has_score: CreationOptional<number>
+
+    /**
+     * 主队进球
+     */
+    @Column(DataType.INTEGER)
+    declare score1: CreationOptional<number | null>
+
+    /**
+     * 客队进球
+     */
+    @Column(DataType.INTEGER)
+    declare score2: CreationOptional<number | null>
+
+    /**
+     * 主队角球
+     */
+    @Column(DataType.INTEGER)
+    declare corner1: CreationOptional<number | null>
+
+    /**
+     * 客队角球
+     */
+    @Column(DataType.INTEGER)
+    declare corner2: CreationOptional<number | null>
+
+    @CreatedAt
+    @Column(DataType.DATE)
+    declare created_at: CreationOptional<Date>
+
+    @UpdatedAt
+    @Column(DataType.DATE)
+    declare updated_at: CreationOptional<Date>
+}
