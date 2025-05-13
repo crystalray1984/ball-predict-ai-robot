@@ -12,7 +12,7 @@ export function isNullOrUndefined(value: any): value is null | undefined {
     return false
 }
 
-export function isEmpty(value: any) {
+export function isEmpty(value: any): value is null | undefined {
     if (isNullOrUndefined(value)) return true
     if (typeof value === 'string') {
         return value === ''

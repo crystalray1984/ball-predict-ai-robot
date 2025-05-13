@@ -6,7 +6,8 @@
         "build": "rimraf dist && tsc",
         "start": "yarn && yarn build && pm2-runtime start pm2.json",
         "start:score": "yarn && yarn build && pm2-runtime start pm2-score.json",
-        "dev:first-surebet": "ts-node ./src/first-surebet.ts"
+        "dev:surebet": "ts-node ./src/first-surebet.ts",
+        "dev:first": "ts-node ./src/first-crown.ts"
     },
     "devDependencies": {
         "@tsconfig/node22": "^22.0.1",
@@ -42,6 +43,7 @@
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
         "mysql2": "^3.14.1",
+        "node-machine-id": "^1.1.12",
         "puppeteer": "^24.6.1",
         "reflect-metadata": "^0.2.2",
         "sequelize": "^6.37.7",

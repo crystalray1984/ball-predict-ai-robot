@@ -9,6 +9,8 @@ import {
     Table,
     UpdatedAt,
 } from 'sequelize-typescript'
+import { Tournament } from './Tournament'
+import { Team } from './Team'
 
 /**
  * 比赛表
@@ -138,4 +140,57 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
     @UpdatedAt
     @Column(DataType.DATE)
     declare updated_at: CreationOptional<Date>
+
+    /**
+     * 准备比赛
+     */
+    static async prepare(
+        data: Pick<
+            Crown.Game,
+            'lid' | 'league' | 'team_c' | 'team_h' | 'team_id_c' | 'team_id_h'
+        > & { match_time: number; crown_match_id: string },
+    ): Promise<number> {
+        //先看看比赛是否存在
+        let match = await Match.findOne({
+            where: {
+                crown_match_id: data.crown_match_id,
+            },
+            attributes: ['id'],
+        })
+        if (match) {
+            return match.id
+        }
+
+        //尝试获取联赛id
+        const [tournament] = await Tournament.findOrCreate({
+            where: {
+                crown_tournament_id: data.lid,
+            },
+            defaults: {
+                crown_tournament_id: data.lid,
+                name: data.league,
+            },
+            attributes: ['id'],
+        })
+
+        //准备好队伍
+        const team1_id = await Team.prepare(data.team_id_h, data.team_h)
+        const team2_id = await Team.prepare(data.team_id_c, data.team_c)
+
+        //插入比赛数据
+        match = await Match.create(
+            {
+                tournament_id: tournament.id,
+                crown_match_id: data.crown_match_id,
+                team1_id,
+                team2_id,
+                match_time: new Date(data.match_time),
+            },
+            {
+                returning: ['id'],
+            },
+        )
+
+        return match.id
+    }
 }
