@@ -107,6 +107,24 @@ export class PromotedOdd extends Model<
     @Column(DataType.STRING)
     declare final_rule: PromotedFinalRule
 
+    @Column(DataType.TINYINT)
+    declare result: CreationOptional<number | null>
+
+    @Column(DataType.TINYINT)
+    declare result1: CreationOptional<number | null>
+
+    @Column(DataType.TINYINT)
+    declare result2: CreationOptional<number | null>
+
+    @Column(DataType.STRING)
+    declare score: CreationOptional<string | null>
+
+    @Column(DataType.TINYINT)
+    declare score1: CreationOptional<number | null>
+
+    @Column(DataType.TINYINT)
+    declare score2: CreationOptional<number | null>
+
     @CreatedAt
     @Column(DataType.DATE)
     declare created_at: CreationOptional<Date>

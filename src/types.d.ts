@@ -292,6 +292,64 @@ declare namespace Crown {
     }
 }
 
+declare namespace Titan007 {
+    /**
+     * 球探网比赛基础数据
+     */
+    interface MatchInfo {
+        /**
+         * 比赛id
+         */
+        match_id: string
+        /**
+         * 比赛时间
+         */
+        match_time: number
+        /**
+         * 主队ID
+         */
+        team1_id: string
+        /**
+         * 客队ID
+         */
+        team2_id: string
+        /**
+         * 主队名称
+         */
+        team1: string
+        /**
+         * 客队名称
+         */
+        team2: string
+        /**
+         * 比赛状态
+         * -1 已完场
+         * >=2 上半场已结束
+         */
+        state: number
+    }
+
+    /**
+     * 赛果数据统计
+     */
+    interface TechData {
+        corner1: number | null
+        corner2: number | null
+        corner1_period1: number | null
+        corner2_period1: number | null
+    }
+
+    /**
+     * 球探网赛果数据
+     */
+    interface MatchScore extends TechData {
+        score1: number
+        score2: number
+        score1_period1: number
+        score2_period1: number
+    }
+}
+
 /**
  * 比赛时段
  */

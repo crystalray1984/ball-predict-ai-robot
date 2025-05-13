@@ -155,9 +155,22 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
             where: {
                 crown_match_id: data.crown_match_id,
             },
-            attributes: ['id'],
+            attributes: ['id', 'match_time'],
         })
         if (match) {
+            if (match.match_time.valueOf() !== data.match_time) {
+                //更新比赛时间
+                await Match.update(
+                    {
+                        match_time: new Date(data.match_time),
+                    },
+                    {
+                        where: {
+                            id: match.id,
+                        },
+                    },
+                )
+            }
             return match.id
         }
 

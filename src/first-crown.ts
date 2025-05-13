@@ -1,6 +1,6 @@
 import { startConsumer } from './common/amqp'
 import { FIRST_QUEUE_NAME } from './common/constants'
-import { getCrownData, init } from './crown'
+import { getCrownData, getCrownMatches, init } from './crown'
 import { compareReadyData } from './crown/compare'
 import { Match, Odd } from './db'
 
@@ -98,12 +98,30 @@ async function processRecords(records: Surebet.Output[]) {
     }
 }
 
+async function processCrownMatches() {
+    const matches = await getCrownMatches()
+
+    //插入比赛
+    for (const match of matches) {
+        await Match.prepare({
+            ...match,
+            crown_match_id: match.ecid,
+            match_time: match.match_time.valueOf(),
+        })
+    }
+}
+
 /**
  * 启动皇冠盘口首次比对
  */
 export async function startFirstCrownRobot() {
     //初始化皇冠浏览器
     await init()
+
+    processCrownMatches()
+
+    //启动定时器，每隔1个小时抓取一次皇冠比赛
+    setInterval(processCrownMatches, 3600000)
 
     while (true) {
         try {

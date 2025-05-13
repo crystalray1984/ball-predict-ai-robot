@@ -9,6 +9,7 @@ import { Setting } from './models/Setting'
 import { Team } from './models/Team'
 import { Titan007Odd } from './models/Titan007Odd'
 import { Tournament } from './models/Tournament'
+import { VMatch } from './models/VMatch'
 
 /**
  * 数据库连接
@@ -20,7 +21,17 @@ export const db = new Sequelize(
         },
         CONFIG.db,
         {
-            models: [Match, Odd, PromotedOdd, Setting, Team, Titan007Odd, Tournament, CrownAccount],
+            models: [
+                Match,
+                Odd,
+                PromotedOdd,
+                Setting,
+                Team,
+                Titan007Odd,
+                Tournament,
+                CrownAccount,
+                VMatch,
+            ],
         },
     ),
 )
@@ -33,3 +44,4 @@ export { Setting } from './models/Setting'
 export { Team } from './models/Team'
 export { Titan007Odd } from './models/Titan007Odd'
 export { Tournament } from './models/Tournament'
+export { VMatch } from './models/VMatch'

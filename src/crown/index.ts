@@ -180,10 +180,20 @@ async function freeCrownAccount() {
     }
 }
 
+let initPromise = undefined as unknown as Promise<void>
 /**
  * 初始化皇冠浏览器环境
  */
 export async function init() {
+    if (initPromise) return initPromise
+    initPromise = _init()
+    initPromise.finally(() => {
+        initPromise = undefined as unknown as Promise<void>
+    })
+    return initPromise
+}
+
+async function _init() {
     if (browser) {
         await browser.close()
         mainPage = undefined as unknown as Page
@@ -337,6 +347,7 @@ export async function reset() {
         await browser.close()
         mainPage = undefined as unknown as Page
         browser = undefined as unknown as Browser
+        await freeCrownAccount()
     }
     lastActiveTime = 0
 }
@@ -345,7 +356,7 @@ export async function reset() {
  * 抓取皇冠比赛列表
  */
 export async function getCrownMatches(): Promise<Required<Crown.MatchInfo>[]> {
-    await ready()
+    await ready(true)
 
     const func = `
 (function () {
