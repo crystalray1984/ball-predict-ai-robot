@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Options } from 'sequelize'
 import { Options as PoolOptions } from 'generic-pool'
+import { Options as RabbitmqOptions } from 'amqplib'
 
 /**
  * 当前应用的根目录
@@ -48,7 +49,6 @@ export type AppDbConfig = Pick<
     | 'pool'
     | 'timezone'
     | 'dialectOptions'
-    | 'timezone'
     | 'schema'
 >
 
@@ -82,6 +82,18 @@ export interface AppConfig {
      * 服务端接口地址
      */
     api_url: string
+    /**
+     * surebet接口调用凭证
+     */
+    surebet_token: string
+    /**
+     * 皇冠首页地址
+     */
+    crown_url?: string
+    /**
+     * rabbitmq连接配置项
+     */
+    rabbitmq: string | RabbitmqOptions.Connect
 }
 
 /**

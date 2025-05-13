@@ -30,6 +30,12 @@ export class Odd extends Model<InferAttributes<Odd>, InferCreationAttributes<Odd
     declare match_id: number
 
     /**
+     * 皇冠比赛id
+     */
+    @Column(DataType.STRING)
+    declare crown_match_id: string
+
+    /**
      * 投注目标
      */
     @Column(DataType.STRING)

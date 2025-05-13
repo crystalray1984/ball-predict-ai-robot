@@ -3,18 +3,20 @@ import { Queue } from './queue'
 /**
  * 限制了执行频率的队列
  */
-export class RateLimiter extends Queue {
+export class RateLimiter {
     /**
      * 允许执行下一个任务的时间
      */
     protected nextRunTime = 0
+
+    protected queue: Queue
 
     /**
      *
      * @param interval 两次任务之间的执行间隔
      */
     constructor(public interval: number) {
-        super(1)
+        this.queue = new Queue(1)
     }
 
     add<T>(task: () => Promise<T> | T): Promise<T> {
@@ -28,7 +30,7 @@ export class RateLimiter extends Queue {
             return task()
         }
 
-        return super.add(wrappedTask)
+        return this.queue.add(wrappedTask)
     }
 
     /**
