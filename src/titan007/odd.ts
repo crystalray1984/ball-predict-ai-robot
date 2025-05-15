@@ -63,13 +63,20 @@ function parseCondition(condition: string) {
 }
 
 function parseNumberCondition(condition: string) {
-    const parts = condition.split('/')
+    const isNag = condition.startsWith('-')
+    const parts = (isNag ? condition.substring(1) : condition).split('/')
+    let result: Decimal
     if (parts.length > 1) {
         //多盘口
-        return Decimal(parts[0]).add(parts[1]).div(2).toString()
+        result = Decimal(parts[0]).add(parts[1]).div(2)
     } else {
         //单盘口
-        return Decimal(parts[0]).toString()
+        result = Decimal(parts[0])
+    }
+    if (isNag) {
+        return Decimal(0).sub(result).toString()
+    } else {
+        return result.toString()
     }
 }
 
