@@ -9,9 +9,12 @@ import { getSetting } from './common/settings'
 import { changeRatio, changeValue, getCrownData, getCrownMatches, init } from './crown'
 import { db, Match, Odd, PromotedOdd } from './db'
 import { getSurebets } from './surebet'
+import { createPublisher, Publisher } from './common/rabbitmq'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
+
+let publisher: Publisher = undefined as unknown as Publisher
 
 /**
  * 根据比赛时间确定用“早盘”还是“今日”获取皇冠数据
@@ -44,6 +47,13 @@ async function processOdd(row: Surebet.OutputData) {
         //如果盘口且已经处于第一次比对满足状态已经存在就不处理了
         return
     }
+
+    //抛到新框架的队列去
+    if (!publisher) {
+        publisher = await createPublisher()
+    }
+    await publisher.publish('ready_check', JSON.stringify(row))
+    console.log('抛到消息队列进行第一次比对', row.crown_match_id)
 
     //抓取皇冠数据
     const crownData = await getCrownData(row.crown_match_id, getShowType(row.match_time))
@@ -899,6 +909,11 @@ export async function startRobot() {
             }
         } catch (err) {
             console.error(err)
+        }
+
+        if (publisher) {
+            await publisher.close()
+            publisher = undefined as unknown as Publisher
         }
     }
 }
