@@ -32,6 +32,13 @@ function getShowType(match_time: number) {
 async function processOdd(row: Surebet.OutputData) {
     const surebet_updated_at = new Date()
 
+    //抛到新框架的队列去
+    if (!publisher) {
+        publisher = await createPublisher()
+    }
+    await publisher.publish('ready_check', JSON.stringify(row))
+    console.log('抛到消息队列进行第一次比对', row.crown_match_id)
+
     //首先对盘口进行判断，是否已经存在
     const exists = await Odd.findOne({
         where: {
@@ -47,13 +54,6 @@ async function processOdd(row: Surebet.OutputData) {
         //如果盘口且已经处于第一次比对满足状态已经存在就不处理了
         return
     }
-
-    //抛到新框架的队列去
-    if (!publisher) {
-        publisher = await createPublisher()
-    }
-    await publisher.publish('ready_check', JSON.stringify(row))
-    console.log('抛到消息队列进行第一次比对', row.crown_match_id)
 
     //抓取皇冠数据
     const crownData = await getCrownData(row.crown_match_id, getShowType(row.match_time))
