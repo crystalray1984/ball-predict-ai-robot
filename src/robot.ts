@@ -779,8 +779,6 @@ let lastMatchTime = 0
  * 启动爬虫任务
  */
 export async function startRobot() {
-    publisher = await createPublisher()
-
     //首先初始化皇冠爬取环境
     while (true) {
         try {
@@ -804,6 +802,7 @@ export async function startRobot() {
             odds.forEach((odd) => console.log(odd))
 
             //循环处理surebet抓回来的数据
+            publisher = await createPublisher()
             for (const odd of odds) {
                 try {
                     await processOdd(odd)
@@ -811,6 +810,7 @@ export async function startRobot() {
                     console.error(err)
                 }
             }
+            await publisher.close()
 
             //处理开赛前2分钟的比赛
             let nearlyMatches = await db.query(
