@@ -910,11 +910,6 @@ export async function startRobot() {
         } catch (err) {
             console.error(err)
         }
-
-        if (publisher) {
-            await publisher.close()
-            publisher = undefined as unknown as Publisher
-        }
     }
 }
 
