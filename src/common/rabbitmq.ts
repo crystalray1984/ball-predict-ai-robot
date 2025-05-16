@@ -1,4 +1,5 @@
 import { connect } from 'amqplib'
+import '../config'
 
 export interface Publisher {
     publish: (queue: string, content: string) => Promise<void>
