@@ -14,8 +14,6 @@ import { createPublisher, Publisher } from './common/rabbitmq'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
-let publisher: Publisher = undefined as unknown as Publisher
-
 /**
  * 根据比赛时间确定用“早盘”还是“今日”获取皇冠数据
  * @param match_time 比赛时间
@@ -33,8 +31,10 @@ async function processOdd(row: Surebet.OutputData) {
     const surebet_updated_at = new Date()
 
     //抛到新框架的队列去
+    const publisher = await createPublisher()
     await publisher.publish('ready_check', JSON.stringify(row))
     console.log('抛到消息队列进行第一次比对', row.crown_match_id)
+    await publisher.close()
 
     //首先对盘口进行判断，是否已经存在
     const exists = await Odd.findOne({
@@ -802,7 +802,6 @@ export async function startRobot() {
             odds.forEach((odd) => console.log(odd))
 
             //循环处理surebet抓回来的数据
-            publisher = await createPublisher()
             for (const odd of odds) {
                 try {
                     await processOdd(odd)
@@ -810,7 +809,6 @@ export async function startRobot() {
                     console.error(err)
                 }
             }
-            await publisher.close()
 
             //处理开赛前2分钟的比赛
             let nearlyMatches = await db.query(
