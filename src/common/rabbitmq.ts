@@ -43,8 +43,8 @@ export async function createPublisher(): Promise<Publisher> {
                     assertedQueues.push(queue)
                 }
                 await new Promise<void>((resolve, reject) => {
-                    channel.sendToQueue(queue, Buffer.from(content, 'utf-8'), {}, (err) => {
-                        if (err) {
+                    channel.sendToQueue(queue, Buffer.from(content, 'utf-8'), {}, (err, ok) => {
+                        if (ok) {
                             resolve()
                         } else {
                             reject(err)
