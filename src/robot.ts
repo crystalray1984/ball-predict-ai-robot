@@ -33,9 +33,6 @@ async function processOdd(row: Surebet.OutputData) {
     const surebet_updated_at = new Date()
 
     //抛到新框架的队列去
-    if (!publisher) {
-        publisher = await createPublisher()
-    }
     await publisher.publish('ready_check', JSON.stringify(row))
     console.log('抛到消息队列进行第一次比对', row.crown_match_id)
 
@@ -782,6 +779,8 @@ let lastMatchTime = 0
  * 启动爬虫任务
  */
 export async function startRobot() {
+    publisher = await createPublisher()
+
     //首先初始化皇冠爬取环境
     while (true) {
         try {
