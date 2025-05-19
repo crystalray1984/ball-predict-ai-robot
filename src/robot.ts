@@ -9,7 +9,7 @@ import { getSetting } from './common/settings'
 import { changeRatio, changeValue, getCrownData, getCrownMatches, init } from './crown'
 import { db, Match, Odd, PromotedOdd } from './db'
 import { getSurebets } from './surebet'
-import { createPublisher, Publisher } from './common/rabbitmq'
+import { publish } from './common/rabbitmq'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -29,12 +29,6 @@ function getShowType(match_time: number) {
  */
 async function processOdd(row: Surebet.OutputData) {
     const surebet_updated_at = new Date()
-
-    //抛到新框架的队列去
-    const publisher = await createPublisher()
-    await publisher.publish('ready_check', JSON.stringify(row))
-    console.log('抛到消息队列进行第一次比对', row.crown_match_id)
-    await publisher.close()
 
     //首先对盘口进行判断，是否已经存在
     const exists = await Odd.findOne({
@@ -533,9 +527,10 @@ async function compareFinalData(
     }
 
     //首先通过读取一些配置值
-    const { promote_condition, promote_symbol } = await getSetting<string>(
+    const { promote_condition, promote_symbol, allow_promote_1 } = await getSetting<string>(
         'promote_condition',
         'promote_symbol',
+        'allow_promote_1',
     )
 
     //根据surebet的盘口类型寻找皇冠数据中的对应盘口
@@ -600,7 +595,7 @@ async function compareFinalData(
     }
 
     //没有对应盘口的时候判断一下开关
-    // if (!allow_promote_1) return
+    if (!allow_promote_1) return
 
     //没有从最终盘口中找到原来对应的盘口，那么对其他盘口进行判断
     const result: { game: Crown.Game; data: MatchGameData }[] = []
@@ -800,6 +795,24 @@ export async function startRobot() {
             const odds = await getSurebets()
             console.log(`收到筛选后的surebet数据 ${odds.length}条`)
             odds.forEach((odd) => console.log(odd))
+
+            //抛到v2队列
+            if (odds.length > 0) {
+                await publish(
+                    'crown_odd',
+                    odds.map((odd) =>
+                        JSON.stringify({
+                            crown_match_id: odd.crown_match_id,
+                            next: 'ready_check_after',
+                            extra: odd,
+                        }),
+                    ),
+                )
+                console.log(
+                    '抛到v2队列处理',
+                    odds.map((t) => t.crown_match_id),
+                )
+            }
 
             //循环处理surebet抓回来的数据
             for (const odd of odds) {
