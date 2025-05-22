@@ -2,6 +2,7 @@ import axios from 'axios'
 import { RateLimiter } from './common/rate-limit'
 import { getSetting } from './common/settings'
 import Decimal from 'decimal.js'
+import { SurebetRecord } from './db'
 
 interface GetOddsOptions {
     /**
@@ -99,8 +100,8 @@ export async function getSurebets() {
         'min-profit': '-0.25',
         'max-profit': '10',
         'hide-different-rules': 'True',
-        startOf: 'PT3M',
-        endOf: 'PT16H',
+        startOf: 'PT5M',
+        endOf: 'PT8H',
     }
 
     //获取所有的推荐盘口数据
@@ -117,6 +118,20 @@ export async function getSurebets() {
         if (!odd) continue
 
         if (odd.type.game !== 'regular' || odd.type.base !== 'overall') continue
+
+        await SurebetRecord.create({
+            crown_match_id: odd.preferred_nav.markers.eventId,
+            match_time: new Date(odd.time),
+            game: odd.type.game,
+            base: odd.type.base,
+            period: odd.type.period,
+            variety: odd.type.variety,
+            type: odd.type.type,
+            condition: odd.type.condition ?? null,
+            value: odd.value.toString(),
+            team1: odd.teams[0],
+            team2: odd.teams[1],
+        })
 
         //数据过滤，只留下需要的盘口
         let pass = false

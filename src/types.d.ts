@@ -135,6 +135,10 @@ declare namespace Surebet {
                 eventId: string
             }
         }
+        /**
+         * 球队名称
+         */
+        teams: string[]
     }
 
     /**

@@ -6,6 +6,7 @@ import { PromotedOdd } from './models/PromotedOdd'
 import { Setting } from './models/Setting'
 import { Team } from './models/Team'
 import { Tournament } from './models/Tournament'
+import { SurebetRecord } from './models/SurebetRecord'
 
 export const db = new Sequelize({
     dialect: 'postgres',
@@ -14,7 +15,7 @@ export const db = new Sequelize({
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
-    models: [Tournament, Team, Match, Odd, Setting, PromotedOdd],
+    models: [Tournament, Team, Match, Odd, Setting, PromotedOdd, SurebetRecord],
     timezone: '+08:00',
     logging: false,
     pool: {
