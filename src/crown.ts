@@ -98,7 +98,7 @@ export async function init() {
     await page.waitForNavigation()
     console.log(page.url())
 
-    if (!page.url().startsWith('https://mos011.com')) {
+    if (!page.url().startsWith(process.env.CROWN_URL ?? 'https://mos011.com')) {
         return init()
     }
 
