@@ -61,7 +61,11 @@ async function getAllOdds(options: GetOddsOptions) {
             }),
         )
 
-        console.log('surebet records', Array.isArray(resp.records))
+        console.log(
+            'surebet records',
+            Array.isArray(resp.records),
+            Array.isArray(resp.records) ? resp.records.length : 0,
+        )
 
         if (!Array.isArray(resp.records)) {
             break
