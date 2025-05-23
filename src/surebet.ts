@@ -33,6 +33,7 @@ async function getOdds(options: GetOddsOptions) {
                     search.append(name, String(value))
                 }
             })
+            console.log(search.toString())
             return search.toString()
         },
         headers: {
