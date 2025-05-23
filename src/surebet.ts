@@ -39,6 +39,7 @@ async function getOdds(options: GetOddsOptions) {
             Authorization: `Bearer ${token}`,
         },
     })
+    console.log(resp.data)
     return resp.data
 }
 
