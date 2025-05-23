@@ -12,7 +12,7 @@ import {
 /**
  * 队伍表
  */
-@Table({ tableName: 'surebet_records', timestamps: true, updatedAt: false })
+@Table({ tableName: 'surebet_record', timestamps: true, updatedAt: false })
 export class SurebetRecord extends Model<
     InferAttributes<SurebetRecord>,
     InferCreationAttributes<SurebetRecord>
