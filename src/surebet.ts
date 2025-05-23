@@ -101,7 +101,7 @@ export async function getSurebets() {
         'max-profit': '10',
         'hide-different-rules': 'True',
         startOf: 'PT5M',
-        endOf: 'PT8H',
+        endOf: 'PT16H',
     }
 
     //获取所有的推荐盘口数据
