@@ -119,19 +119,23 @@ export async function getSurebets() {
 
         if (odd.type.game !== 'regular' || odd.type.base !== 'overall') continue
 
-        await SurebetRecord.create({
-            crown_match_id: odd.preferred_nav.markers.eventId,
-            match_time: new Date(odd.time),
-            game: odd.type.game,
-            base: odd.type.base,
-            period: odd.type.period,
-            variety: odd.type.variety,
-            type: odd.type.type,
-            condition: odd.type.condition ?? null,
-            value: odd.value.toString(),
-            team1: odd.teams[0],
-            team2: odd.teams[1],
-        })
+        try {
+            await SurebetRecord.create({
+                crown_match_id: odd.preferred_nav.markers.eventId,
+                match_time: new Date(odd.time),
+                game: odd.type.game,
+                base: odd.type.base,
+                period: odd.type.period,
+                variety: odd.type.variety,
+                type: odd.type.type,
+                condition: odd.type.condition ?? null,
+                value: odd.value.toString(),
+                team1: odd.teams[0],
+                team2: odd.teams[1],
+            })
+        } catch (err) {
+            console.error(err)
+        }
 
         //数据过滤，只留下需要的盘口
         let pass = false
