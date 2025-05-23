@@ -39,7 +39,7 @@ async function getOdds(options: GetOddsOptions) {
             Authorization: `Bearer ${token}`,
         },
     })
-    console.log(resp.data)
+    console.log(JSON.stringify(resp.data, null, 4))
     return resp.data
 }
 
@@ -89,6 +89,15 @@ async function getAllOdds(options: GetOddsOptions) {
  * 获取surebet数据
  */
 export async function getSurebets() {
+    const settings = await getSetting(
+        'min_surebet_value',
+        'surebet_outcomes',
+        'surebet_max_profit',
+        'surebet_min_profit',
+        'surebet_start_of',
+        'surebet_end_of',
+    )
+
     //构建请求surebet的数据
     const options: GetOddsOptions = {
         token: process.env.SUREBET_TOKEN!,
@@ -97,20 +106,18 @@ export async function getSurebets() {
         sport: 'Football',
         limit: 100,
         oddsFormat: 'eu',
-        outcomes: '2',
-        'min-profit': '-0.25',
-        'max-profit': '10',
+        outcomes: settings.surebet_outcomes,
+        'min-profit': settings.surebet_min_profit,
+        'max-profit': settings.surebet_max_profit,
         'hide-different-rules': 'True',
-        startOf: 'PT5M',
-        endOf: 'PT16H',
+        startOf: settings.surebet_start_of,
+        endOf: settings.surebet_end_of,
     }
 
     //获取所有的推荐盘口数据
     const records = await getAllOdds(options)
 
     const outupt: Surebet.OutputData[] = []
-
-    const min_surebet_value = (await getSetting('min_surebet_value')) as string
 
     //对盘口进行筛选
     for (const record of records) {
@@ -214,7 +221,7 @@ export async function getSurebets() {
         }
 
         //赔率大于指定的值
-        if (!Decimal(odd.value).gte(min_surebet_value)) {
+        if (!Decimal(odd.value).gte(settings.min_surebet_value)) {
             pass = false
         }
 
