@@ -14,6 +14,8 @@ import { publish } from './common/rabbitmq'
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
+const FINAL_CHECK_TIME = 3
+
 /**
  * 根据比赛时间确定用“早盘”还是“今日”获取皇冠数据
  * @param match_time 比赛时间
@@ -828,7 +830,7 @@ export async function startRobot() {
                 }
             }
 
-            //处理开赛前2分钟的比赛
+            //处理开赛前的比赛
             let nearlyMatches = await db.query(
                 {
                     query: `
@@ -844,7 +846,12 @@ export async function startRobot() {
             ORDER BY
                 "match"."match_time"
             `,
-                    values: ['ready', new Date(), new Date(Date.now() + 300000), ''],
+                    values: [
+                        'ready',
+                        new Date(),
+                        new Date(Date.now() + FINAL_CHECK_TIME * 60000),
+                        '',
+                    ],
                 },
                 {
                     type: QueryTypes.SELECT,
@@ -852,7 +859,7 @@ export async function startRobot() {
                 },
             )
 
-            console.log('5分钟内开赛的比赛', nearlyMatches.length)
+            console.log(`${FINAL_CHECK_TIME}分钟内开赛的比赛`, nearlyMatches.length)
 
             if (nearlyMatches.length > 0) {
                 const odds = await Odd.findAll({
@@ -864,7 +871,7 @@ export async function startRobot() {
                     },
                 })
 
-                console.log('5分钟内开赛的盘口', odds.length)
+                console.log(`${FINAL_CHECK_TIME}分钟内开赛的盘口`, odds.length)
 
                 nearlyMatches.forEach((match) => {
                     match.odds = odds.filter((t) => t.match_id === match.id)
