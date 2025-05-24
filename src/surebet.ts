@@ -33,14 +33,12 @@ async function getOdds(options: GetOddsOptions) {
                     search.append(name, String(value))
                 }
             })
-            console.log(search.toString())
             return search.toString()
         },
         headers: {
             Authorization: `Bearer ${token}`,
         },
     })
-    console.log(JSON.stringify(resp.data, null, 4))
     return resp.data
 }
 
