@@ -123,10 +123,10 @@ async function processNearlyMatch(match: Match) {
     for (const odd of match.odds) {
         //计算过滤参数
         const pass = (() => {
-            //特殊逻辑角球大可以推
-            if (odd.variety === 'corner' && odd.type === 'over') {
-                return true
-            }
+            //特殊逻辑角球大小球可以推
+            // if (odd.variety === 'corner' && (odd.type === 'over' || odd.type === 'under')) {
+            //     return true
+            // }
 
             if (!corner_enable && odd.variety === 'corner') {
                 //角球过滤
